@@ -33,4 +33,5 @@ https://github.com/Allodi-Lab
 > For the `MoSeq_analysis`, model statistics were first determined, then the SE values were determined. The SE values were then ordered by control frequency. The `ordered_SE` data was used for the thesis. GEELM model was just for testing and can be ignored.  
 > For `RNAscope_analysis`, data used in the thesis was analysed in GraphPad Prism, using a Nested T-Test. `blind` excel file is the raw values from Zeiss, renamed. `macros` excel file is the averaged excel file, aided by excel macros for automation of calculations. `processed` excel file formats the values easier for GraphPad Prism, with `trnapose` excel file being the same file but transposed. Example images, which were also reported in the thesis, can be found under the Zeiss folder.
 > The cropped versions of the behavioural videos were used for DeepLabCut + Keypoint-MoSeq to prevent model training on paradigm reflections. There are only folders for Cohort 1 + 3, as cohort 2 only had one mouse and so was combined into cohort 3.
+> Download .html files to view all outputs for R-coding notebooks.
 
