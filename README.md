@@ -2,7 +2,8 @@
 # Nicole MRes Project README
 
 All code used for **EthoVision** behavioural analysis and **Keypoint-MoSeq** behavioural analysis pipeline is available on the lab GitHub account.  
-Larger files, such as the **RNAscope** images, can be found on the University long-term storage, either by clicking the link below or via Map Network (`X:\nj35\MRes`):
+Larger files, such as the **RNAscope** images, can be found on the University long-term storage, either by clicking the link below or via Map Network (`X:\nj35\MRes`). 
+RNAscope data includes all images captured using Zeiss 3.9 software on Jeeves PCs, stored in `Documents/Nicole/` and uploaded to the long-term storage.
 
 **Allodi Lab GitHub Repository:**  
 https://github.com/Allodi-Lab
@@ -27,5 +28,10 @@ https://github.com/Allodi-Lab
 
 ---
 
+
+## Version
+
 > **Note:**  
-> RNAscope data includes all images captured using Zeiss 3.9 software on Jeeves PCs, stored in `Documents/Nicole/` and uploaded to the long-term storage.
+> For Ethovision_analysis, model statistics were first determined then raincloud plots produced wich were used in the thesis.
+> For the MoSeq_analysis, model statistical were first determined, then the SE values were determined, the SE values were then ordered by control frequency. the `ordered_SE` data was used for the thesis. GEELM model was just for testing and can be ignored.
+> For RNAscope_analysis, attempted replication of the code used in GraphPad Prism, but was unsuccessful. Data used in thesis was analysed in GraphPad Prism instead, using a Nested T-Test.
