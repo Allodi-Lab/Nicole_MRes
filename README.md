@@ -15,8 +15,8 @@ https://github.com/Allodi-Lab
 
 ## Language
 
-- **Behavior_Analysis** – Keypoint-MoSeq *(Python)* – EthoVision *(R)*
-- **RNAscope_Analysis** – *(R)*
+- **Behavior_Analysis** – Keypoint-MoSeq *(Python + R)* – EthoVision *(R)*
+- **RNAscope_Analysis** – *(GraphPad Prism)*
 
 ---
 
