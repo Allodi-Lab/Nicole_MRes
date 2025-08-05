@@ -1,0 +1,690 @@
+---
+title: "C9orf72_Nicole_Data"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code.
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*.
+
+```{r}
+plot(cars)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+## Start of C9orf72 Analysis
+
+#### EPM_C9_analysis
+
+```{r}
+#Setup working directory
+setwd("C:\\Users\\nj35\\OneDrive - University of St Andrews\\Masters\\Undergrad Corrected Data")
+getwd()
+
+```
+
+```{r}
+#download packages for managing r packages and excel
+install.packages("pacman")
+install.packages("readxl")
+install.packages("tidyverse")
+install.packages("emmeans")
+install.packages("afex")
+
+```
+
+```{r}
+#load packages
+library(pacman)
+library(readxl)
+library(tidyverse)
+library(tibble)
+library(emmeans)
+library(conflicted)
+library(afex)
+library(lme4)
+library(Matrix)
+library(car)
+library(ggplot2)
+library(ggbeeswarm)
+library(ggsignif)
+```
+
+```{r}
+# Load Excel file
+df <- read_xlsx("EPM_C9_post.xlsx", sheet = "calculations")
+```
+
+```{r}
+# Create separate data frames based on specific rows for each type of calculation
+epm_c9_post_open_arm_freq <- df[1:3,]
+epm_c9_post_open_arm_time <- df[7:10,]
+epm_c9_post_neutral_time <- df[13:16,]
+epm_c9_post_distance <- df[19:22,]
+epm_c9_post_speed <- df[25:28,]
+
+```
+
+```{r}
+# all new dataframes have incorrect headings, copy the first row and convert to column heading then delete the first row.
+#names(epm_c9_post_open_arm_freq) <- epm_c9_post_open_arm_freq[1, ] #since this calculated data was already at the top of the excel file, it has correct heading
+#epm_c9_post_open_arm_freq <- epm_c9_post_open_arm_freq[-1,]
+
+names(epm_c9_post_open_arm_time) <- epm_c9_post_open_arm_time[1, ]
+epm_c9_post_open_arm_time <- epm_c9_post_open_arm_time[-1,]
+
+names(epm_c9_post_neutral_time) <- epm_c9_post_neutral_time[1, ]
+epm_c9_post_neutral_time <- epm_c9_post_neutral_time[-1,]
+
+names(epm_c9_post_distance) <- epm_c9_post_distance[1, ]
+epm_c9_post_distance <- epm_c9_post_distance[-1, ]
+
+names(epm_c9_post_speed) <- epm_c9_post_speed[1, ]
+epm_c9_post_speed <- epm_c9_post_speed[-1, ]
+```
+
+```{r}
+#delete last 3 columns for speed and distance as they are empty
+epm_c9_post_distance <- epm_c9_post_distance[, -c(3:5)]
+epm_c9_post_speed <- epm_c9_post_speed[, -c(3:5)]
+```
+
+#### EPM_WT_analysis
+
+```{r}
+df2 <- read_xlsx("EPM_WT_post.xlsx", sheet = "calculations")
+```
+
+```{r}
+# Create separate data frames based on specific rows for each type of calculation
+epm_WT_post_open_arm_freq <- df2[1:5,]
+epm_WT_post_open_arm_time <- df2[9:14,]
+epm_WT_post_neutral_time <- df2[17:22,]
+epm_WT_post_distance <- df2[25:30,]
+epm_WT_post_speed <- df2[33:38,]
+```
+
+```{r}
+# all new dataframes have incorrect headings, copy the first row and convert to column heading then delete the first row.
+#names(epm_WT_post_open_arm_freq) <- epm_WT_post_open_arm_freq[1, ]
+#epm_WT_post_open_arm_freq <- epm_WT_post_open_arm_freq[-1,]
+
+names(epm_WT_post_open_arm_time) <- epm_WT_post_open_arm_time[1, ]
+epm_WT_post_open_arm_time <- epm_WT_post_open_arm_time[-1,]
+
+names(epm_WT_post_neutral_time) <- epm_WT_post_neutral_time[1, ]
+epm_WT_post_neutral_time <- epm_WT_post_neutral_time[-1,]
+
+names(epm_WT_post_distance) <- epm_WT_post_distance[1, ]
+epm_WT_post_distance <- epm_WT_post_distance[-1, ]
+
+names(epm_WT_post_speed) <- epm_WT_post_speed[1, ]
+epm_WT_post_speed <- epm_WT_post_speed[-1, ]
+```
+
+```{r}
+#delete last 3 columns for speed and distance as they are empty
+epm_WT_post_distance <- epm_WT_post_distance[, -c(3:5)]
+epm_WT_post_speed <- epm_WT_post_speed[, -c(3:5)]
+```
+
+### EPM_Anova
+
+```{r}
+#combine EPM_WT and EPM_C9 datasets, merge and distuinguish dataframes by genotype
+epm_post_arm_freq <- rbind(
+  epm_c9_post_open_arm_freq %>% mutate(genotype = "C9orf72") %>% relocate(genotype, .after = 1),
+  epm_WT_post_open_arm_freq %>% mutate(genotype = "WT") %>% relocate(genotype, .after = 1)
+)
+
+epm_post_arm_time <- rbind(
+  epm_c9_post_open_arm_time %>% mutate(genotype = "C9orf72") %>% relocate(genotype, .after = 1),
+  epm_WT_post_open_arm_time %>% mutate(genotype = "WT") %>% relocate(genotype, .after = 1)
+)
+
+epm_post_neutral_time <- rbind(
+  epm_c9_post_neutral_time %>% mutate(genotype = "C9orf72") %>% relocate(genotype, .after = 1),
+  epm_WT_post_neutral_time %>% mutate(genotype = "WT") %>% relocate(genotype, .after = 1)
+)
+
+epm_post_distance <- rbind(
+  epm_c9_post_distance %>% mutate(genotype = "C9orf72") %>% relocate(genotype, .after = 1),
+  epm_WT_post_distance %>% mutate(genotype = "WT") %>% relocate(genotype, .after = 1)
+)
+
+epm_post_speed <- rbind(
+  epm_c9_post_speed %>% mutate(genotype = "C9orf72") %>% relocate(genotype, .after = 1),
+  epm_WT_post_speed %>% mutate(genotype = "WT") %>% relocate(genotype, .after = 1)
+)
+```
+
+```{r}
+view(epm_post_arm_freq)
+view(epm_post_arm_time)
+view(epm_post_neutral_time)
+view(epm_post_distance)
+view(epm_post_speed)
+```
+
+```{r}
+#check if the individual mice under "ID" variable is considered a factor. If not change mouse to factor
+str(epm_post_distance$ID)
+```
+
+```{r}
+#change ID to factor
+epm_post_arm_freq$ID <- as.factor(epm_post_arm_freq$ID)
+epm_post_arm_time$ID <- as.factor(epm_post_arm_time$ID)
+epm_post_neutral_time$ID <- as.factor(epm_post_neutral_time$ID)
+epm_post_distance$ID <- as.factor(epm_post_distance$ID)
+epm_post_speed$ID <- as.factor(epm_post_speed$ID)
+
+#convert genotype to factor
+epm_post_arm_freq$genotype <- as.factor(epm_post_arm_freq$genotype)
+epm_post_arm_time$genotype <- as.factor(epm_post_arm_time$genotype)
+epm_post_neutral_time$genotype <- as.factor(epm_post_neutral_time$genotype)
+epm_post_distance$genotype <- as.factor(epm_post_distance$genotype)
+epm_post_speed$genotype <- as.factor(epm_post_speed$genotype)
+```
+
+```{r}
+#convert dependent variable to numeric
+epm_post_arm_freq$`% open freq` <- as.numeric(epm_post_arm_freq$`% open freq`)
+epm_post_arm_time$`% open time` <- as.numeric(epm_post_arm_time$`% open time`)
+epm_post_neutral_time$`% neutral time` <- as.numeric(epm_post_neutral_time$`% neutral time`)
+epm_post_distance$distance <- as.numeric(epm_post_distance$distance)
+epm_post_speed$speed <- as.numeric(epm_post_speed$speed)
+```
+
+```{r}
+# Perform Welch's T-Test
+#epm_post_arm_freq
+t.test(`% open freq` ~ genotype, data = epm_post_arm_freq, var.equal = FALSE)
+```
+
+```{r}
+#epm_post_arm_time
+t.test(`% open time` ~ genotype, data = epm_post_arm_time, var.equal = FALSE)
+```
+
+```{r}
+#epm_post_neutral_time
+t.test(`% neutral time` ~ genotype, data = epm_post_neutral_time, var.equal = FALSE)
+```
+
+```{r}
+#epm_post_distance
+t.test(distance ~ genotype, data = epm_post_distance, var.equal = FALSE)
+```
+
+```{r}
+#epm_post_speed
+t.test(speed ~ genotype, data = epm_post_speed, var.equal = FALSE)
+```
+
+## EPM Plot
+
+```{r}
+p_load(ggbeeswarm, ggsignif)
+library(ggplot2)
+```
+
+```{r}
+#install colour palette
+#install.packages("RColorBrewer")
+#library(RColorBrewer)
+```
+
+```{r}
+#view all colour palettes
+#display.brewer.all()
+```
+
+```{r}
+#Set the color palette
+#cbbPalette <- c("#fcfdbf", "#feca8d", "#D67236", "#f1605d", "#9e2f7f", "#440f76")
+#spectralPalette <- display.brewer.pal(n = 11, name = "Spectral")
+```
+
+#### EPM open freq
+
+```{r}
+#Change level order so WT is first then C9
+epm_post_arm_freq$genotype <- factor(epm_post_arm_freq$genotype, levels = c("WT", "C9orf72"))
+
+EPM_open_freq_plot = ggplot(epm_post_arm_freq, aes(x = genotype, y = `% open freq`)) +
+  geom_beeswarm(data = epm_post_arm_freq, size = 2.5, aes(color = ID)) + 
+  labs (
+    y = "Frequency in Open Arms %",
+    x = "Genotype",
+    title = "EPM - post-symptomatic"
+  ) +
+  geom_signif(comparisons = list(c("C9orf72", "WT")),
+              map_signif_level = TRUE,
+              y_position = 50,
+              annotations = c("ns")) +
+  geom_crossbar(stat = "summary", fun = mean, width = 0.2, fatten = 1.5, aes(group = genotype)) +
+  geom_errorbar(data = epm_post_arm_freq, stat = "summary", fun.data = mean_se, width = 0.1, position = "dodge") +
+  theme(
+    text = element_text(size = 13),
+    plot.title = element_text(hjust = 0.5) # Center the title
+  )
+ # scale_color_manual(values = spectralPalette)
+
+EPM_open_freq_plot #view plot
+#save plot
+#ggsave("C:/Users/nj35/OneDrive - University of St Andrews/Masters/Ilary Data/EPM_open_freq.png", plot = EPM_open_freq_plot, width = 5, height = 4)
+```
+
+#### EPM open time
+
+```{r}
+#Change level order so WT is first then C9
+epm_post_arm_time$genotype <- factor(epm_post_arm_time$genotype, levels = c("WT", "C9orf72"))
+
+EPM_open_time_plot = ggplot(epm_post_arm_time, aes(x = genotype, y = `% open time`)) +
+  geom_beeswarm(data = epm_post_arm_time, size = 2.5, aes(color = ID)) + 
+  labs (
+    y = "Time Spent in Open Arms (%)",
+    x = "Genotype",
+    title = "EPM - post-symptomatic"
+  ) +
+  geom_signif(comparisons = list(c("C9orf72", "WT")),
+              map_signif_level = TRUE,
+              y_position = 65,
+              annotations = c("ns")) +
+  geom_crossbar(stat = "summary", fun = mean, width = 0.2, fatten = 1.5, aes(group = genotype)) +
+  geom_errorbar(data = epm_post_arm_time, stat = "summary", fun.data = mean_se, width = 0.1, position = "dodge") + #stand errors used for plots
+  theme(
+    text = element_text(size = 13),
+    plot.title = element_text(hjust = 0.5) # Center the title
+  )
+ # scale_color_manual(values = spectralPalette)
+
+EPM_open_time_plot #view plot
+#ggsave("C:/Users/nj35/OneDrive - University of St Andrews/Masters/Ilary Data/EPM_open_time.png", plot = EPM_open_time_plot, width = 5, height = 4)
+```
+
+#### EPM neutral time
+
+```{r}
+#Change level order so WT is first then C9
+epm_post_neutral_time$genotype <- factor(epm_post_neutral_time$genotype, levels = c("WT", "C9orf72"))
+
+EPM_neutral_plot = ggplot(epm_post_neutral_time, aes(x = genotype, y = `% neutral time`)) +
+  geom_beeswarm(data = epm_post_neutral_time, size = 2.5, aes(color = ID)) + 
+  labs (
+    y = "Time Spent in Neutral Zone (s)",
+    x = "Genotype",
+    title = "EPM - post-symptomatic"
+  ) +
+  geom_signif(comparisons = list(c("C9orf72", "WT")),
+              map_signif_level = TRUE,
+              y_position = 55,
+              annotations = c("ns")) +
+  geom_crossbar(stat = "summary", fun = mean, width = 0.2, fatten = 1.5, aes(group = genotype)) +
+  geom_errorbar(data = epm_post_neutral_time, stat = "summary", fun.data = mean_se, width = 0.1, position = "dodge") +
+  theme(
+    text = element_text(size = 13),
+    plot.title = element_text(hjust = 0.5) # Center the title
+  )
+ # scale_color_manual(values = spectralPalette)
+
+EPM_neutral_plot #view plot
+#ggsave("C:/Users/nj35/OneDrive - University of St Andrews/Masters/Ilary Data/EPM_neutral_time.png", plot = EPM_neutral_plot, width = 5, height = 4)
+```
+
+#### EPM distance
+
+```{r}
+#Change level order so WT is first then C9
+epm_post_distance$genotype <- factor(epm_post_distance$genotype, levels = c("WT", "C9orf72"))
+
+EPM_distance_plot = ggplot(epm_post_distance, aes(x = genotype, y = distance)) +
+  geom_beeswarm(data = epm_post_distance, size = 2.5, aes(color = ID)) + 
+  labs (
+    y = "Distance (cm)",
+    x = "Genotype",
+    title = "EPM - post-symptomatic"
+  ) +
+  geom_signif(comparisons = list(c("C9orf72", "WT")),
+              map_signif_level = TRUE,
+              y_position = 145,
+              annotations = c("p<0.05*")) +
+  geom_crossbar(stat = "summary", fun = mean, width = 0.2, fatten = 1.5, aes(group = genotype)) +
+  geom_errorbar(data = epm_post_distance, stat = "summary", fun.data = mean_se, width = 0.1, position = "dodge") +
+  theme(
+    text = element_text(size = 13),
+    plot.title = element_text(hjust = 0.5) # Center the title
+  )
+ # scale_color_manual(values = spectralPalette)
+
+EPM_distance_plot #view plot
+#ggsave("C:/Users/nj35/OneDrive - University of St Andrews/Masters/Ilary Data/EPM_distance.png", plot = EPM_distance_plot, width = 5, height = 4)
+```
+
+#### EPM speed
+
+```{r}
+#Change level order so WT is first then C9
+epm_post_speed$genotype <- factor(epm_post_speed$genotype, levels = c("WT", "C9orf72"))
+
+EPM_speed_plot = ggplot(epm_post_speed, aes(x = genotype, y = speed )) +
+  geom_beeswarm(data = epm_post_speed, size = 2.5, aes(color = ID)) + 
+  labs (
+    y = "Speed (cm/s)",
+    x = "Genotype",
+    title = "EPM - post-symptomatic"
+  ) +
+  geom_signif(comparisons = list(c("C9orf72", "WT")),
+              map_signif_level = TRUE,
+              y_position = 1.2,
+              annotations = c("p<0.05*")) +
+  geom_crossbar(stat = "summary", fun = mean, width = 0.2, fatten = 1.5, aes(group = genotype)) +
+  geom_errorbar(data = epm_post_speed, stat = "summary", fun.data = mean_se, width = 0.1, position = "dodge") +
+  theme(
+    text = element_text(size = 13),
+    plot.title = element_text(hjust = 0.5) # Center the title
+  )
+ # scale_color_manual(values = spectralPalette)
+
+EPM_speed_plot #view plot
+#ggsave("C:/Users/nj35/OneDrive - University of St Andrews/Masters/Ilary Data/EPM_speed.png", plot = EPM_speed_plot, width = 5, height = 4)
+```
+
+# OFT Analysis
+
+## WT_pre
+
+```{r}
+df3 <- read_xlsx("OFT_WT_pre.xlsx", sheet = "calculations")
+```
+
+```{r}
+# Create separate data frames based on specific rows for each type of calculation
+oft_wt_pre_peri <- df3[1:5,]
+oft_wt_pre_distance <- df3[8:13,]
+```
+
+```{r}
+#correct headings for distance
+names(oft_wt_pre_distance) <- oft_wt_pre_distance[1, ]
+oft_wt_pre_distance <- oft_wt_pre_distance[-1, ]
+```
+
+```{r}
+#delete last 6 columns for speed and distance as they are empty
+oft_wt_pre_distance <- oft_wt_pre_distance[, -c(5:10)]
+```
+
+## C9_pre
+
+```{r}
+df4 <- read_xlsx("OFT_C9_pre.xlsx", sheet = "calculations")
+```
+
+```{r}
+# Create separate data frames based on specific rows for each type of calculation
+oft_c9_pre_peri <- df4[1:3,]
+oft_c9_pre_distance <- df4[6:9,]
+```
+
+```{r}
+#correct headings for distance
+names(oft_c9_pre_distance) <- oft_c9_pre_distance[1, ]
+oft_c9_pre_distance <- oft_c9_pre_distance[-1, ]
+```
+
+```{r}
+#delete last 6 columns for speed and distance as they are empty
+oft_c9_pre_distance <- oft_c9_pre_distance[, -c(5:10)]
+```
+
+#### OFT pre ANOVA
+
+```{r}
+#combine OFT_WT and OFT_C9 datasets, merge and distuinguish dataframes by genotype
+OFT_pre_peri <- rbind(
+  oft_wt_pre_peri %>% mutate(genotype = "WT") %>% relocate(genotype, .after = 1),
+  oft_c9_pre_peri %>% mutate(genotype = "C9orf72") %>% relocate(genotype, .after = 1)
+)
+
+OFT_pre_distance <- rbind(
+  oft_wt_pre_distance %>% mutate(genotype = "WT") %>% relocate(genotype, .after = 1),
+  oft_c9_pre_distance %>% mutate(genotype = "C9orf72") %>% relocate(genotype, .after = 1)
+)
+```
+
+```{r}
+#change ID to factor
+OFT_pre_peri$ID <- as.factor(OFT_pre_peri$ID)
+OFT_pre_distance$ID <- as.factor(OFT_pre_distance$ID)
+
+#convert genotype to factor
+OFT_pre_peri$genotype <- as.factor(OFT_pre_peri$genotype)
+OFT_pre_distance$genotype <- as.factor(OFT_pre_distance$genotype)
+```
+
+```{r}
+#convert dependent variable to numeric
+OFT_pre_peri$`normalised periphery %` <- as.numeric(OFT_pre_peri$`normalised periphery %`)
+OFT_pre_distance$`normalised distance` <- as.numeric(OFT_pre_distance$`normalised distance`)
+```
+
+```{r}
+#perform welch t-test
+#OFT_pre_peri
+t.test(`normalised periphery %` ~ genotype, data = OFT_pre_peri, var.equal = FALSE)
+```
+
+```{r}
+#OFT_pre_distance
+t.test(`normalised distance` ~ genotype, data = OFT_pre_distance, var.equal = FALSE)
+```
+
+## WT_post
+
+```{r}
+df5 <- read_xlsx("OFT_WT_post.xlsx", sheet = "calculations")
+```
+
+```{r}
+# Create separate data frames based on specific rows for each type of calculation
+oft_wt_post_peri <- df5[1:5,]
+oft_wt_post_distance <- df5[8:13,]
+```
+
+```{r}
+#correct headings for distance
+names(oft_wt_post_distance) <- oft_wt_post_distance[1, ]
+oft_wt_post_distance <- oft_wt_post_distance[-1, ]
+```
+
+```{r}
+#delete last 6 columns for speed and distance as they are empty
+oft_wt_post_distance <- oft_wt_post_distance[, -c(5:10)]
+```
+
+## C9_post
+
+```{r}
+df6 <- read_xlsx("OFT_C9_post.xlsx", sheet = "calculations")
+```
+
+```{r}
+# Create separate data frames based on specific rows for each type of calculation
+oft_c9_post_peri <- df6[1:3,]
+oft_c9_post_distance <- df6[6:9,]
+```
+
+```{r}
+#correct headings for distance
+names(oft_c9_post_distance) <- oft_c9_post_distance[1, ]
+oft_c9_post_distance <- oft_c9_post_distance[-1, ]
+```
+
+```{r}
+#delete last 6 columns for speed and distance as they are empty
+oft_c9_post_distance <- oft_c9_post_distance[, -c(5:10)]
+```
+
+#### OFT post ANOVA
+
+```{r}
+#combine OFT_WT and OFT_C9 datasets, merge and distuinguish dataframes by genotype
+OFT_post_peri <- rbind(
+  oft_wt_post_peri %>% mutate(genotype = "WT") %>% relocate(genotype, .after = 1),
+  oft_c9_post_peri %>% mutate(genotype = "C9orf72") %>% relocate(genotype, .after = 1)
+  )
+
+OFT_post_distance <- rbind(
+  oft_wt_post_distance %>% mutate(genotype = "WT") %>% relocate(genotype, .after = 1),
+  oft_c9_post_distance %>% mutate(genotype = "C9orf72") %>% relocate(genotype, .after = 1)
+  )
+```
+
+```{r}
+#change ID to factor
+OFT_post_peri$ID <- as.factor(OFT_post_peri$ID)
+OFT_post_distance$ID <- as.factor(OFT_post_distance$ID)
+
+#convert genotype to factor
+OFT_post_peri$genotype <- as.factor(OFT_post_peri$genotype)
+OFT_post_distance$genotype <- as.factor(OFT_post_distance$genotype)
+```
+
+```{r}
+#convert dependent variable to numeric
+OFT_post_peri$`normalised periphery %` <- as.numeric(OFT_post_peri$`normalised periphery %`)
+OFT_post_distance$`normalised distance` <- as.numeric(OFT_post_distance$`normalised distance`)
+```
+
+```{r}
+#perform welch t-test
+#OFT_post_peri
+t.test(`normalised periphery %` ~ genotype, data = OFT_post_peri, var.equal = FALSE)
+```
+
+```{r}
+#OFT_post_distance
+t.test(`normalised distance` ~ genotype, data = OFT_post_distance, var.equal = FALSE)
+```
+
+# OFT plot
+
+## OFT pre_peri
+
+```{r}
+#Change level order so WT is first then C9
+OFT_pre_peri$genotype <- factor(OFT_pre_peri$genotype, levels = c("WT", "C9orf72"))
+
+OFT_pre_peri_plot = ggplot(OFT_pre_peri, aes(x = genotype, y = `normalised periphery %` )) +
+  geom_beeswarm(data = OFT_pre_peri, size = 2.5, aes(color = ID)) + 
+  labs (
+    y = "Normalised Periphery Preference %",
+    x = "Genotype",
+    title = "OFT - pre-symptomatic"
+  ) +
+  geom_signif(comparisons = list(c("WT", "C9orf72")),
+              map_signif_level = TRUE,
+              y_position = 105,
+              annotations = c("ns")) +
+  geom_crossbar(stat = "summary", fun = mean, width = 0.2, fatten = 1.5, aes(group = genotype)) +
+  geom_errorbar(data = OFT_pre_peri, stat = "summary", fun.data = mean_se, width = 0.1, position = "dodge") +
+  theme(
+    text = element_text(size = 13),
+    plot.title = element_text(hjust = 0.5) # Center the title
+  )
+
+OFT_pre_peri_plot #view plot
+#ggsave("C:/Users/nj35/OneDrive - University of St Andrews/Masters/Ilary Data/OFT_pre_peri.png", plot = OFT_pre_peri_plot, width = 5, height = 4)
+```
+
+## OFT pre_distance
+
+```{r}
+#Change level order so WT is first then C9
+OFT_pre_distance$genotype <- factor(OFT_pre_distance$genotype, levels = c("WT", "C9orf72"))
+
+OFT_pre_distance_plot = ggplot(OFT_pre_distance, aes(x = genotype, y = `normalised distance` )) +
+  geom_beeswarm(data = OFT_pre_distance, size = 2.5, aes(color = ID)) + 
+  labs (
+    y = "Normalised Distance (cm)",
+    x = "Genotype",
+    title = "OFT - pre-symptomatic"
+  ) +
+  geom_signif(comparisons = list(c("WT", "C9orf72")),
+              map_signif_level = TRUE,
+              y_position = 120,
+              annotations = c("ns")) +
+  geom_crossbar(stat = "summary", fun = mean, width = 0.2, fatten = 1.5, aes(group = genotype)) +
+  geom_errorbar(data = OFT_pre_distance, stat = "summary", fun.data = mean_se, width = 0.1, position = "dodge") +
+  theme(
+    text = element_text(size = 13),
+    plot.title = element_text(hjust = 0.5) # Center the title
+  )
+
+OFT_pre_distance_plot #view plot
+#ggsave("C:/Users/nj35/OneDrive - University of St Andrews/Masters/Ilary Data/OFT_pre_distance.png", plot = OFT_pre_distance_plot, width = 5, height = 4)
+```
+
+## OFT post_peri
+
+```{r}
+#Change level order so WT is first then C9
+OFT_post_peri$genotype <- factor(OFT_post_peri$genotype, levels = c("WT", "C9orf72"))
+
+OFT_post_peri_plot = ggplot(OFT_post_peri, aes(x = genotype, y = `normalised periphery %` )) +
+  geom_beeswarm(data = OFT_post_peri, size = 2.5, aes(color = ID)) + 
+  labs (
+    y = "Normalised Periphery Preference %",
+    x = "Genotype",
+    title = "OFT - post-symptomatic"
+  ) +
+  geom_signif(comparisons = list(c("WT", "C9orf72")),
+              map_signif_level = TRUE,
+              y_position = 105,
+              annotations = c("ns")) +
+  geom_crossbar(stat = "summary", fun = mean, width = 0.2, fatten = 1.5, aes(group = genotype)) +
+  geom_errorbar(data = OFT_post_peri, stat = "summary", fun.data = mean_se, width = 0.1, position = "dodge") +
+  theme(
+    text = element_text(size = 13),
+    plot.title = element_text(hjust = 0.5) # Center the title
+  )
+
+OFT_post_peri_plot #view plot
+#ggsave("C:/Users/nj35/OneDrive - University of St Andrews/Masters/Ilary Data/OFT_post_peri.png", plot = OFT_post_peri_plot, width = 5, height = 4)
+```
+
+## OFT post_distance
+
+```{r}
+#Change level order so WT is first then C9
+OFT_post_distance$genotype <- factor(OFT_post_distance$genotype, levels = c("WT", "C9orf72"))
+
+OFT_post_distance_plot = ggplot(OFT_post_distance, aes(x = genotype, y = `normalised distance` )) +
+  geom_beeswarm(data = OFT_post_distance, size = 2.5, aes(color = ID)) + 
+  labs (
+    y = "Normalised Distance (cm)",
+    x = "Genotype",
+    title = "OFT - post-symptomatic"
+  ) +
+  geom_signif(comparisons = list(c("WT", "C9orf72")),
+              map_signif_level = TRUE,
+              y_position = 115,
+              annotations = c("ns")) +
+  geom_crossbar(stat = "summary", fun = mean, width = 0.2, fatten = 1.5, aes(group = genotype)) +
+  geom_errorbar(data = OFT_post_distance, stat = "summary", fun.data = mean_se, width = 0.1, position = "dodge") +
+  theme(
+    text = element_text(size = 13),
+    plot.title = element_text(hjust = 0.5) # Center the title
+  )
+
+OFT_post_distance_plot #view plot
+#ggsave("C:/Users/nj35/OneDrive - University of St Andrews/Masters/Ilary Data/OFT_post_distance.png", plot = OFT_post_distance_plot, width = 5, height = 4)
+```
