@@ -1,0 +1,72 @@
+
+  bodyparts:
+  - nose
+  - left_ear
+  - right_ear
+  - left_ear_tip
+  - right_ear_tip
+  - left_eye
+  - right_eye
+  - neck
+  - mid_back
+  - mouse_center
+  - mid_backend
+  - mid_backend2
+  - mid_backend3
+  - tail_base
+  - tail1
+  - tail2
+  - tail3
+  - tail4
+  - tail5
+  - left_shoulder
+  - left_midside
+  - left_hip
+  - right_shoulder
+  - right_midside
+  - right_hip
+  - tail_end
+  - head_midpoint
+
+skeleton:
+  - [nose, left_eye]
+  - [nose, right_eye]
+  - [nose, left_ear]
+  - [nose, right_ear]
+  - [left_eye, right_eye]
+  - [left_ear, left_ear_tip]
+  - [right_ear, right_ear_tip]
+  - [neck, left_shoulder]
+  - [neck, right_shoulder]
+  - [neck, mid_back]
+  - [left_shoulder, left_hip]
+  - [right_shoulder, right_hip]
+  - [left_hip, left_midside]
+  - [right_hip, right_midside]
+  - [left_midside, mid_back]
+  - [right_midside, mid_back]
+  - [mid_back, mid_backend]
+  - [mid_backend, mid_backend2]
+  - [mid_backend2, mid_backend3]
+  - [mid_backend3, tail_base]
+  - [tail_base, tail1]
+  - [tail1, tail2]
+  - [tail2, tail3]
+  - [tail3, tail4]
+  - [tail4, tail5]
+  - [tail5, tail_end]
+  - [mid_back, mouse_center]
+  - [neck, head_midpoint]
+
+video_dir = [
+    '/home/nj35/MRes/TDP videos/pre-induction/OFT/crop',
+    '/home/nj35/MRes/TDP videos/post-induction-w1/OFT/crop',
+    '/home/nj35/MRes/TDP videos/post-induction-w2/OFT/crop'
+]
+
+
+kpms.setup_project(
+    project_dir,
+    video_dir=video_dir,
+    bodyparts=bodyparts,
+    skeleton=skeleton)
