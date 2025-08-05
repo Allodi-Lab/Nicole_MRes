@@ -1,0 +1,2892 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+plot(cars)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+#Ethovision Metrics
+
+##OFT
+
+```{r}
+#Setup working directory
+setwd("C:/Users/nj35/OneDrive - University of St Andrews/Ethovision R-Analysis")
+getwd()
+```
+
+```{r}
+#download packages for managing r packages and excel
+install.packages("pacman")
+install.packages("readxl")
+install.packages("tidyverse") 
+install.packages("emmeans")
+install.packages("afex")
+install.packages("installr")
+install.packages("conflicted")
+install.packages("sandwich")
+install.packages("lmtest")
+install.packages("geepack")
+install.packages("tibble")
+install.packages("effectsize")
+install.packages("lmerTest")
+install.packages("ggpubr")
+install.packages("ggdist")
+
+```
+
+```{r}
+#load packages
+library(pacman)
+library(readxl)
+library(tidyverse) #includes ggplot and dplyr
+library(tibble)
+library(emmeans)
+library(conflicted)
+library(afex)
+library(lme4) #LMM model
+library(lmerTest)  # For p-values in LMM
+library(Matrix)
+library(car)
+library(tibble)
+library(effectsize)
+library(ggpubr)
+library(ggdist)
+```
+
+
+```{r}
+list.files()
+```
+
+
+```{r}
+# Load Excel file (.xlsx) — specify sheet if needed
+etho_oft <- read_excel("OFT_summary_ethovision.xlsx")
+
+# Set ID and group as factors
+etho_oft$ID <- as.factor(etho_oft$ID)
+etho_oft$group <- factor(etho_oft$group, levels = c("control", "post_w1", "post_w2"))  # sets "control" as baseline
+
+# Rename long variable names to simpler ones
+names(etho_oft)[names(etho_oft) == "Distance moved Center-point Total cm"] <- "Distance_cm"
+names(etho_oft)[names(etho_oft) == "Velocity Center-point Mean cm/s"] <- "Velocity_cm/s"
+names(etho_oft)[names(etho_oft) == "Center / Center-point Frequency"] <- "Centre_Freq"
+names(etho_oft)[names(etho_oft) == "Periphery / Center-point Frequency"] <- "Peri_Freq"
+names(etho_oft)[names(etho_oft) == "Center / Center-point Cumulative Duration s"] <- "Centre_Dur"
+names(etho_oft)[names(etho_oft) == "Periphery / Center-point Cumulative Duration s"] <- "Peri_Dur"
+
+# Convert renamed columns to numeric
+etho_oft$'Distance_cm' <- as.numeric(etho_oft$'Distance_cm')
+etho_oft$'Velocity_cm/s' <- as.numeric(etho_oft$'Velocity_cm/s')
+etho_oft$'Centre_Freq' <- as.numeric(etho_oft$'Centre_Freq')
+etho_oft$'Peri_Freq' <- as.numeric(etho_oft$'Peri_Freq')
+etho_oft$'Centre_Dur' <- as.numeric(etho_oft$'Centre_Dur')
+etho_oft$'Peri_Dur' <- as.numeric(etho_oft$'Peri_Dur')
+etho_oft$'periphery_pref' <- as.numeric(etho_oft$'periphery_pref')
+```
+
+```{r}
+names(etho_oft)
+```
+###distance
+
+```{r}
+model_oft <- lmer(Distance_cm ~ group + (1 | ID), data = etho_oft)
+summary(model_oft)
+```
+
+```{r}
+#assumption check 1 - Normality of residuals (should be normally distributed) - violates
+qqnorm(resid(model_oft))
+qqline(resid(model_oft))
+#probs a lil' bit non-normal, thus, when calculating confidence intervals, used "boot" method which assumes non-normality
+```
+
+```{r}
+#checks for distribution, compliments residual plot
+hist(resid(model_oft)) 
+```
+
+```{r}
+#Assumption 2 - Homoscedasticity (variance should be consistent) - passes
+plot(fitted(model_oft), resid(model_oft))
+#meets assumption, evenly distributed, thus, Homoscedasticity
+```
+
+```{r}
+#When you plot residuals by ID, you're looking for:
+#No systematic pattern across individuals.
+#No obvious trends within IDs (e.g., all high or all low residuals).
+#Ideally, residuals centered around zero with some variation.
+boxplot(resid(model_oft) ~ etho_oft$ID)
+```
+
+
+```{r}
+#Assumption 3 - confidence intervals - passes
+confint(model_oft, method = "boot")
+#if CI includes zero between 2.5% and 97.5% then that effect is not statistically significant.
+
+```
+
+```{r}
+# estimated marginal means for Distance_cm (taken from model)
+emm_oft <- emmeans(model_oft, ~ group)
+emm_oft
+#kenward-roger is for unequal sample size
+```
+
+```{r}
+#used for plotting
+#convert emmeans to dataframe
+emm_oft_df <- as.data.frame(emm_oft)
+emm_oft_df
+```
+
+
+```{r}
+#pairwise comparison with tukey, due to lots of syllable comparisons (more tests)
+pairwise_oft <- contrast(emm_oft, method = "pairwise", adjust = "tukey") #bonferroni, Satterthwaite, Kenward-Roger, holm, tukey, dunnett, sidak [tukey, holm]
+#kenward-roger is for unequal sample size
+summary(pairwise_oft)
+```
+
+
+```{r}
+# Convert the pairwise results into a data frame using summary
+pairwise_results_oft <- summary(pairwise_oft)
+
+# Filter significant results (p-value < 0.05)
+sig_results_oft <- pairwise_results_oft %>%
+  filter(p.value < 0.05)
+
+# Add significance labels (***, **, *, ns)
+sig_labels_oft <- pairwise_results_oft %>%
+  mutate(
+    label = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  )
+
+# View labeled results
+print(sig_labels_oft)
+
+```
+```{r}
+#used for plotting significance lines; assigned group (control, post_w1, post_w2 to a contrast pairwise comparison)
+#group 1 starts, group 2 finishes
+sig_labels_oft <- pairwise_results_oft %>%
+  mutate(
+    group1 = case_when(
+      contrast == "control - post_w1" ~ "control",
+      contrast == "control - post_w2" ~ "control",
+      contrast == "post_w1 - post_w2" ~ "post_w1"
+    ),
+    group2 = case_when(
+      contrast == "control - post_w1" ~ "post_w1",
+      contrast == "control - post_w2" ~ "post_w2",
+      contrast == "post_w1 - post_w2" ~ "post_w2",
+    ),
+    y.position = 8000 + 
+                 c(0, 800, 400), # stagger heights (switched group 2 and 3)
+    p.adj.signif = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  ) %>%
+  select(group1, group2, y.position, p.adj.signif)
+sig_labels_oft <- sig_labels_oft[c(1, 3, 2), ]
+sig_labels_oft
+```
+
+
+```{r}
+# Create the plot
+plot_oft <- ggplot(emm_oft_df, aes(x = group, y = emmean, color = group, group = group)) +
+  # Add points at the means for each group
+  geom_point(size = 3) +
+  # Add error bars for standard error
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2) +
+  # Custom colors for different groups
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  # Labels for axes and legend
+  labs(
+    x = "Timepoint",
+    y = "Distance (cm)",
+    color = NULL
+  ) +
+  # Apply clean theme
+  theme_bw() +
+  theme(
+    text = element_text(size = 13),
+    panel.grid.minor = element_blank(),
+    legend.position = "right",
+    legend.box.margin = margin(0, 50, 0, 0),
+    axis.text.x = element_blank()
+    )
+
+# Add raw individual data points (from your etho_oft dataset)
+plot_oft <- plot_oft + 
+  geom_jitter(data = etho_oft, aes(x = group, y = Distance_cm, color = ID), 
+              size = 1.5, width = 0.1, alpha = 0.6, inherit.aes = FALSE)
+
+# Add in significant lines and astericks
+plot_oft <- plot_oft +
+  stat_pvalue_manual(sig_labels_oft, #stat_pvalue_manual is the function
+                     label = "p.adj.signif", 
+                     tip.length = 0.02, #changes dipped line bit
+                     size = 5)
+plot_oft
+#ggsave("oft_graph(distance).png", plot = plot_oft, width = 8, height = 6) #makes spaces visible
+```
+
+###speed
+
+```{r}
+model_oft2 <- lmer(`Velocity_cm/s` ~ group + (1 | ID), data = etho_oft)
+summary(model_oft2)
+```
+```{r}
+#assumption check 1 - Normality of residuals (should be normally distributed) - violates
+qqnorm(resid(model_oft2))
+qqline(resid(model_oft2))
+#probs a lil' bit non-normal, thus, when calculating confidence intervals, used "boot" method which assumes non-normality
+```
+```{r}
+#checks for distribution, compliments residual plot
+hist(resid(model_oft2)) 
+```
+```{r}
+#When you plot residuals by ID, you're looking for:
+#No systematic pattern across individuals.
+#No obvious trends within IDs (e.g., all high or all low residuals).
+#Ideally, residuals centered around zero with some variation.
+boxplot(resid(model_oft2) ~ etho_oft$ID)
+```
+```{r}
+#Assumption 2 - Homoscedasticity (variance should be consistent) - passes
+plot(fitted(model_oft2), resid(model_oft2))
+#meets assumption, evenly distributed, thus, Homoscedasticity
+```
+
+
+```{r}
+#Assumption 3 - confidence intervals - passes
+confint(model_oft2, method = "boot")
+#if CI includes zero between 2.5% and 97.5% then that effect is not statistically significant.
+
+```
+```{r}
+# estimated marginal means for Distance_cm (taken from model)
+emm_oft2 <- emmeans(model_oft2, ~ group)
+emm_oft2
+#kenward-roger is for unequal sample size
+```
+```{r}
+#used for plotting
+#convert emmeans to dataframe
+emm_oft_df2 <- as.data.frame(emm_oft2)
+emm_oft_df2
+```
+```{r}
+#pairwise comparison with tukey
+pairwise_oft2 <- contrast(emm_oft2, method = "pairwise", adjust = "tukey") #bonferroni, Satterthwaite, Kenward-Roger, holm, tukey, dunnett, sidak [tukey, holm]
+#kenward-roger is for unequal sample size
+summary(pairwise_oft2)
+```
+```{r}
+# Convert the pairwise results into a data frame using summary
+pairwise_results_oft2 <- summary(pairwise_oft2)
+
+# Filter significant results (p-value < 0.05)
+sig_results_oft2 <- pairwise_results_oft2 %>%
+  filter(p.value < 0.05)
+
+# Add significance labels (***, **, *, ns)
+sig_labels_oft2 <- pairwise_results_oft2 %>%
+  mutate(
+    label = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  )
+
+# View labeled results
+print(sig_labels_oft2)
+```
+```{r}
+#used for plotting significance lines; assigned group (control, post_w1, post_w2 to a contrast pairwise comparison)
+#group 1 starts, group 2 finishes
+sig_labels_oft2 <- pairwise_results_oft2 %>%
+  mutate(
+    group1 = case_when(
+      contrast == "control - post_w1" ~ "control",
+      contrast == "control - post_w2" ~ "control",
+      contrast == "post_w1 - post_w2" ~ "post_w1"
+    ),
+    group2 = case_when(
+      contrast == "control - post_w1" ~ "post_w1",
+      contrast == "control - post_w2" ~ "post_w2",
+      contrast == "post_w1 - post_w2" ~ "post_w2",
+    ),
+    y.position = 13 + 
+                 c(0.8, 2.4, 1.6), # stagger heights (switched group 2 and 3)
+    p.adj.signif = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  ) %>%
+  select(group1, group2, y.position, p.adj.signif)
+sig_labels_oft2 <- sig_labels_oft2[c(1, 3, 2), ]
+sig_labels_oft2
+```
+```{r}
+# Create the plot
+plot_oft2 <- ggplot(emm_oft_df2, aes(x = group, y = emmean, color = group, group = group)) +
+  # Add points at the means for each group
+  geom_point(size = 3) +
+  # Add error bars for standard error
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2) +
+  # Custom colors for different groups
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  # Labels for axes and legend
+  labs(
+    x = "Timepoint",
+    y = "Speed (cm/s)",
+    color = NULL
+  ) +
+  # Apply clean theme
+  theme_bw() +
+  theme(
+    text = element_text(size = 13),
+    panel.grid.minor = element_blank(),
+    legend.position = "right",
+    legend.box.margin = margin(0, 50, 0, 0),
+    axis.text.x = element_blank()
+    )
+
+# Add raw individual data points (from your etho_oft dataset)
+plot_oft2 <- plot_oft2 + 
+  geom_jitter(data = etho_oft, aes(x = group, y = `Velocity_cm/s`, color = ID), 
+              size = 1.5, width = 0.1, alpha = 0.6, inherit.aes = FALSE)
+
+# Add in significant lines and astericks
+plot_oft2 <- plot_oft2 +
+  stat_pvalue_manual(sig_labels_oft2, #stat_pvalue_manual is the function
+                     label = "p.adj.signif", 
+                     tip.length = 0.02, #changes dipped line bit
+                     size = 5)
+plot_oft2
+#ggsave("oft_graph(speed).png", plot = plot_oft2, width = 8, height = 6) #makes spaces visible
+```
+
+
+###periphery pref
+
+```{r}
+model_oft3 <- lmer(periphery_pref ~ group + (1 | ID), data = etho_oft)
+summary(model_oft3)
+```
+```{r}
+#assumption check 1 - Normality of residuals (should be normally distributed) - violates
+qqnorm(resid(model_oft3))
+qqline(resid(model_oft3))
+#probs a lil' bit non-normal, thus, when calculating confidence intervals, used "boot" method which assumes non-normality
+```
+```{r}
+#checks for distribution, compliments residual plot
+hist(resid(model_oft3)) 
+```
+```{r}
+#Assumption 2 - Homoscedasticity (variance should be consistent) - passes
+plot(fitted(model_oft3), resid(model_oft3))
+#meets assumption, evenly distributed, thus, Homoscedasticity
+```
+```{r}
+#Assumption 3 - confidence intervals - passes
+confint(model_oft3, method = "boot")
+#if CI includes zero between 2.5% and 97.5% then that effect is not statistically significant.
+
+```
+```{r}
+# estimated marginal means for Distance_cm (taken from model)
+emm_oft3 <- emmeans(model_oft3, ~ group)
+emm_oft3
+#kenward-roger is for unequal sample size
+```
+```{r}
+#used for plotting
+#convert emmeans to dataframe
+emm_oft_df3 <- as.data.frame(emm_oft3)
+emm_oft_df3
+```
+```{r}
+#pairwise comparison with tukey, due to lots of syllable comparisons (more tests)
+pairwise_oft3 <- contrast(emm_oft3, method = "pairwise", adjust = "tukey") #bonferroni, Satterthwaite, Kenward-Roger, holm, tukey, dunnett, sidak [tukey, holm]
+#kenward-roger is for unequal sample size
+summary(pairwise_oft3)
+```
+```{r}
+# Convert the pairwise results into a data frame using summary
+pairwise_results_oft3 <- summary(pairwise_oft3)
+
+# Filter significant results (p-value < 0.05)
+sig_results_oft3 <- pairwise_results_oft3 %>%
+  filter(p.value < 0.05)
+
+# Add significance labels (***, **, *, ns)
+sig_labels_oft3 <- pairwise_results_oft3 %>%
+  mutate(
+    label = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  )
+
+# View labeled results
+print(sig_labels_oft3)
+```
+
+```{r}
+#used for plotting significance lines; assigned group (control, post_w1, post_w2 to a contrast pairwise comparison)
+#group 1 starts, group 2 finishes
+sig_labels_oft3 <- pairwise_results_oft3 %>%
+  mutate(
+    group1 = case_when(
+      contrast == "control - post_w1" ~ "control",
+      contrast == "control - post_w2" ~ "control",
+      contrast == "post_w1 - post_w2" ~ "post_w1"
+    ),
+    group2 = case_when(
+      contrast == "control - post_w1" ~ "post_w1",
+      contrast == "control - post_w2" ~ "post_w2",
+      contrast == "post_w1 - post_w2" ~ "post_w2",
+    ),
+    y.position = 98 + 
+                 c(2, 10, 6), # stagger heights (switched group 2 and 3)
+    p.adj.signif = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  ) %>%
+  select(group1, group2, y.position, p.adj.signif)
+sig_labels_oft3 <- sig_labels_oft3[c(1, 3, 2), ]
+sig_labels_oft3
+```
+```{r}
+# Create the plot
+plot_oft3 <- ggplot(emm_oft_df3, aes(x = group, y = emmean, color = group, group = group)) +
+  # Add points at the means for each group
+  geom_point(size = 3) +
+  # Add error bars for standard error
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2) +
+  # Custom colors for different groups
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  # Labels for axes and legend
+  labs(
+    x = "Timepoint",
+    y = "Periphery Preference (%)",
+    color = NULL
+  ) +
+  # Apply clean theme
+  theme_bw() +
+  theme(
+    text = element_text(size = 13),
+    panel.grid.minor = element_blank(),
+    legend.position = "right",
+    legend.box.margin = margin(0, 50, 0, 0),
+    axis.text.x = element_blank()
+    )
+
+# Add raw individual data points (from your etho_oft dataset)
+plot_oft3 <- plot_oft3 + 
+  geom_jitter(data = etho_oft, aes(x = group, y = periphery_pref, color = ID), 
+              size = 1.5, width = 0.1, alpha = 0.6, inherit.aes = FALSE)
+
+# Add in significant lines and astericks
+plot_oft3 <- plot_oft3 +
+  stat_pvalue_manual(sig_labels_oft3, #stat_pvalue_manual is the function
+                     label = "p.adj.signif", 
+                     tip.length = 0.02, #changes dipped line bit
+                     size = 5)
+plot_oft3
+#ggsave("oft_graph(peri).png", plot = plot_oft3, width = 8, height = 6) #makes spaces visible
+```
+
+##NOR
+
+```{r}
+# Load Excel file (.xlsx) — specify sheet if needed
+etho_nor <- read_excel("NOR_summary_ethovision.xlsx")
+
+# Set ID and group as factors
+etho_nor$ID <- as.factor(etho_nor$ID)
+etho_nor$group <- factor(etho_nor$group, levels = c("control", "post_w1", "post_w2"))  # sets "control" as baseline
+
+# Rename long variable names to simpler ones
+names(etho_nor)[names(etho_nor) == "Distance moved Center-point Total cm"] <- "Distance_cm"
+names(etho_nor)[names(etho_nor) == "Velocity Center-point Mean cm/s"] <- "Velocity_cm/s"
+
+# Convert renamed columns to numeric
+etho_nor$'Distance_cm' <- as.numeric(etho_nor$'Distance_cm')
+etho_nor$'Velocity_cm/s' <- as.numeric(etho_nor$'Velocity_cm/s')
+etho_nor$'familiarity_contact' <- as.numeric(etho_nor$'familiarity_contact')
+etho_nor$'familiarity_2cm' <- as.numeric(etho_nor$'familiarity_2cm')
+```
+
+```{r}
+names(etho_nor)
+```
+
+###contact time novel object
+
+```{r}
+model_nor2 <- lmer(familiarity_contact ~ group + (1 | ID), data = etho_nor)
+summary(model_nor2)
+```
+```{r}
+#assumption check 1 - Normality of residuals (should be normally distributed) - violates
+qqnorm(resid(model_nor2))
+qqline(resid(model_nor2))
+#probs a lil' bit non-normal, thus, when calculating confidence intervals, used "boot" method which assumes non-normality
+```
+```{r}
+#checks for distribution, compliments residual plot; violates
+hist(resid(model_nor2)) 
+```
+```{r}
+#Assumption 2 - Homoscedasticity (variance should be consistent) - violates
+plot(fitted(model_nor2), resid(model_nor2))
+#this means SE values are biased and will affect p value accuracy in the model
+```
+```{r}
+#When you plot residuals by ID, you're looking for:
+#No systematic pattern across individuals.
+#No obvious trends within IDs (e.g., all high or all low residuals).
+#Ideally, residuals centered around zero with some variation.
+boxplot(resid(model_nor2) ~ etho_nor$ID)
+```
+```{r}
+#Assumption 3 - confidence intervals - passes
+confint(model_nor2, method = "boot")
+#if CI includes zero between 2.5% and 97.5% then that effect is not statistically significant.
+
+```
+```{r}
+# estimated marginal means for Distance_cm (taken from model)
+emm_nor2 <- emmeans(model_nor2, ~ group)
+emm_nor2
+#kenward-roger is for unequal sample size
+```
+```{r}
+#used for plotting
+#convert emmeans to dataframe
+emm_nor_df2 <- as.data.frame(emm_nor2)
+emm_nor_df2
+```
+```{r}
+#pairwise comparison with tukey, due to lots of syllable comparisons (more tests)
+pairwise_nor2 <- contrast(emm_nor2, method = "pairwise", adjust = "tukey") #bonferroni, Satterthwaite, Kenward-Roger, holm, tukey, dunnett, sidak [tukey, holm]
+#kenward-roger is for unequal sample size
+summary(pairwise_nor2)
+```
+```{r}
+# Convert the pairwise results into a data frame using summary
+pairwise_results_nor2 <- summary(pairwise_nor2)
+
+# Filter significant results (p-value < 0.05)
+sig_results_nor2 <- pairwise_results_nor2 %>%
+  filter(p.value < 0.05)
+
+# Add significance labels (***, **, *, ns)
+sig_labels_nor2 <- pairwise_results_nor2 %>%
+  mutate(
+    label = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  )
+
+# View labeled results
+print(sig_labels_nor2)
+```
+```{r}
+#used for plotting significance lines; assigned group (control, post_w1, post_w2 to a contrast pairwise comparison)
+#group 1 starts, group 2 finishes
+sig_labels_nor2 <- pairwise_results_nor2 %>%
+  mutate(
+    group1 = case_when(
+      contrast == "control - post_w1" ~ "control",
+      contrast == "control - post_w2" ~ "control",
+      contrast == "post_w1 - post_w2" ~ "post_w1"
+    ),
+    group2 = case_when(
+      contrast == "control - post_w1" ~ "post_w1",
+      contrast == "control - post_w2" ~ "post_w2",
+      contrast == "post_w1 - post_w2" ~ "post_w2",
+    ),
+    y.position = 100 + 
+                 c(0, 10, 5), # stagger heights (switched group 2 and 3)
+    p.adj.signif = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  ) %>%
+  select(group1, group2, y.position, p.adj.signif)
+sig_labels_nor2 <- sig_labels_nor2[c(1, 3, 2), ]
+sig_labels_nor2
+```
+```{r}
+# Create the plot
+plot_nor2 <- ggplot(emm_nor_df2, aes(x = group, y = emmean, color = group, group = group)) +
+  # Add points at the means for each group
+  geom_point(size = 3) +
+  # Add error bars for standard error
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2) +
+  # Custom colors for different groups
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  # Labels for axes and legend
+  labs(
+    x = "Timepoint",
+    y = "Object Recognition (%)",
+    color = NULL
+  ) +
+  # Add custom y-axis breaks and labels
+  scale_y_continuous(breaks = seq(0, 100, by = 25)) + # This line adds breaks at 0, 25, 50, 75, 100
+  # Apply clean theme
+  theme_bw() +
+  theme(
+    text = element_text(size = 13),
+    panel.grid.minor = element_blank(),
+    legend.position = "right",
+    legend.box.margin = margin(0, 50, 0, 0),
+    axis.text.x = element_blank()
+    )
+
+# Add raw individual data points (from your etho_nor dataset)
+plot_nor2 <- plot_nor2 + 
+  geom_jitter(data = etho_nor, aes(x = group, y = familiarity_contact, color = ID), 
+              size = 1.5, width = 0.1, alpha = 0.6, inherit.aes = FALSE)
+
+# Add in significant lines and astericks
+plot_nor2 <- plot_nor2 +
+  stat_pvalue_manual(sig_labels_nor2, #stat_pvalue_manual is the function
+                     label = "p.adj.signif", 
+                     tip.length = 0.02, #changes dipped line bit
+                     size = 5)
+plot_nor2
+#ggsave("nor_graph(contact).png", plot = plot_nor2, width = 8, height = 6) #makes spaces visible
+```
+
+###2cm time novel object
+
+```{r}
+model_nor <- lmer(familiarity_2cm ~ group + (1 | ID), data = etho_nor)
+summary(model_nor)
+```
+```{r}
+#assumption check 1 - Normality of residuals (should be normally distributed) - violates
+qqnorm(resid(model_nor))
+qqline(resid(model_nor))
+#probs a lil' bit non-normal, thus, when calculating confidence intervals, used "boot" method which assumes non-normality
+```
+```{r}
+#checks for distribution, compliments residual plot
+hist(resid(model_nor)) 
+```
+```{r}
+#Assumption 2 - Homoscedasticity (variance should be consistent) - violates?
+plot(fitted(model_nor), resid(model_nor))
+#meets assumption, evenly distributed, thus, Homoscedasticity
+```
+```{r}
+#When you plot residuals by ID, you're looking for:
+#No systematic pattern across individuals.
+#No obvious trends within IDs (e.g., all high or all low residuals).
+#Ideally, residuals centered around zero with some variation.
+boxplot(resid(model_nor) ~ etho_nor$ID)
+```
+
+
+```{r}
+#Assumption 3 - confidence intervals - passes
+confint(model_nor, method = "boot")
+#if CI includes zero between 2.5% and 97.5% then that effect is not statistically significant.
+
+```
+```{r}
+# estimated marginal means for Distance_cm (taken from model)
+emm_nor <- emmeans(model_nor, ~ group)
+emm_nor
+#kenward-roger is for unequal sample size
+```
+```{r}
+#used for plotting
+#convert emmeans to dataframe
+emm_nor_df <- as.data.frame(emm_nor)
+emm_nor_df
+```
+```{r}
+#pairwise comparison with tukey, due to lots of syllable comparisons (more tests)
+pairwise_nor <- contrast(emm_nor, method = "pairwise", adjust = "tukey") #bonferroni, Satterthwaite, Kenward-Roger, holm, tukey, dunnett, sidak [tukey, holm]
+#kenward-roger is for unequal sample size
+summary(pairwise_nor)
+```
+```{r}
+# Convert the pairwise results into a data frame using summary
+pairwise_results_nor <- summary(pairwise_nor)
+
+# Filter significant results (p-value < 0.05)
+sig_results_nor <- pairwise_results_nor %>%
+  filter(p.value < 0.05)
+
+# Add significance labels (***, **, *, ns)
+sig_labels_nor <- pairwise_results_nor %>%
+  mutate(
+    label = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  )
+
+# View labeled results
+print(sig_labels_nor)
+```
+```{r}
+#used for plotting significance lines; assigned group (control, post_w1, post_w2 to a contrast pairwise comparison)
+#group 1 starts, group 2 finishes
+sig_labels_nor <- pairwise_results_nor %>%
+  mutate(
+    group1 = case_when(
+      contrast == "control - post_w1" ~ "control",
+      contrast == "control - post_w2" ~ "control",
+      contrast == "post_w1 - post_w2" ~ "post_w1"
+    ),
+    group2 = case_when(
+      contrast == "control - post_w1" ~ "post_w1",
+      contrast == "control - post_w2" ~ "post_w2",
+      contrast == "post_w1 - post_w2" ~ "post_w2",
+    ),
+    y.position = 100 + 
+                 c(0, 20, 10), # stagger heights (switched group 2 and 3)
+    p.adj.signif = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  ) %>%
+  select(group1, group2, y.position, p.adj.signif)
+sig_labels_nor <- sig_labels_nor[c(1, 3, 2), ]
+sig_labels_nor
+```
+```{r}
+# Create the plot
+plot_nor <- ggplot(emm_nor_df, aes(x = group, y = emmean, color = group, group = group)) +
+  # Add points at the means for each group
+  geom_point(size = 3) +
+  # Add error bars for standard error
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2) +
+  # Custom colors for different groups
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  # Labels for axes and legend
+  labs(
+    x = "Timepoint",
+    y = "Object Recognition Index (%)",
+    color = NULL
+  ) +
+  # Add custom y-axis breaks and labels
+  scale_y_continuous(breaks = seq(0, 100, by = 25)) + # This line adds breaks at 0, 25, 50, 75, 100
+  # Apply clean theme
+  theme_bw() +
+  theme(
+    text = element_text(size = 13),
+    panel.grid.minor = element_blank(),
+    legend.position = "right",
+    legend.box.margin = margin(0, 50, 0, 0),
+    axis.text.x = element_blank()
+    )
+
+# Add raw individual data points (from your etho_nor dataset)
+plot_nor <- plot_nor + 
+  geom_jitter(data = etho_nor, aes(x = group, y = familiarity_2cm, color = ID), 
+              size = 1.5, width = 0.1, alpha = 0.6, inherit.aes = FALSE)
+
+# Add in significant lines and astericks
+plot_nor <- plot_nor +
+  stat_pvalue_manual(sig_labels_nor, #stat_pvalue_manual is the function
+                     label = "p.adj.signif", 
+                     tip.length = 0.02, #changes dipped line bit
+                     size = 5)
+plot_nor
+#ggsave("nor_graph(2cm).png", plot = plot_nor, width = 8, height = 6) #makes spaces visible
+```
+
+##EPM
+
+
+```{r}
+# Load Excel file (.xlsx) — specify sheet if needed
+etho_epm <- read_excel("EPM_summary_ethovision.xlsx")
+
+# Set ID and group as factors
+etho_epm$ID <- as.factor(etho_epm$ID)
+etho_epm$group <- factor(etho_epm$group, levels = c("control", "post_w1", "post_w2"))  # sets "control" as baseline
+
+# Rename long variable names to simpler ones
+names(etho_epm)[names(etho_epm) == "Distance moved Center-point Total cm"] <- "Distance_cm"
+names(etho_epm)[names(etho_epm) == "Velocity Center-point Mean cm/s"] <- "Velocity_cm/s"
+
+# Convert renamed columns to numeric
+etho_epm$'Distance_cm' <- as.numeric(etho_epm$'Distance_cm')
+etho_epm$'Velocity_cm/s' <- as.numeric(etho_epm$'Velocity_cm/s')
+etho_epm$'time_ClosedArms' <- as.numeric(etho_epm$'time_ClosedArms')
+etho_epm$'time_OpenArms' <- as.numeric(etho_epm$'time_OpenArms')
+etho_epm$'freq_ClosedArms' <- as.numeric(etho_epm$'freq_ClosedArms')
+etho_epm$'time_ClosedArms' <- as.numeric(etho_epm$'time_ClosedArms')
+```
+
+```{r}
+names(etho_epm)
+```
+
+
+###frequency in closed arms
+
+```{r}
+model_epm <- lmer(freq_ClosedArms ~ group + (1 | ID), data = etho_epm)
+summary(model_epm)
+```
+
+```{r}
+#assumption check 1 - Normality of residuals (should be normally distributed) - violates
+qqnorm(resid(model_epm))
+qqline(resid(model_epm))
+#probs a lil' bit non-normal, thus, when calculating confidence intervals, used "boot" method which assumes non-normality
+```
+```{r}
+#checks for distribution, compliments residual plot
+hist(resid(model_epm)) 
+```
+
+```{r}
+#Assumption 2 - Homoscedasticity (variance should be consistent) - violates
+plot(fitted(model_epm), resid(model_epm))
+```
+
+```{r}
+#When you plot residuals by ID, you're looking for:
+#No systematic pattern across individuals.
+#No obvious trends within IDs (e.g., all high or all low residuals).
+#Ideally, residuals centered around zero with some variation.
+boxplot(resid(model_epm) ~ etho_epm$ID)
+```
+
+```{r}
+#Assumption 3 - confidence intervals - passes
+confint(model_epm, method = "boot")
+#if CI includes zero between 2.5% and 97.5% then that effect is not statistically significant.
+
+```
+
+```{r}
+# estimated marginal means for Distance_cm (taken from model)
+emm_epm <- emmeans(model_epm, ~ group)
+emm_epm
+#kenward-roger is for unequal sample size
+```
+
+```{r}
+#used for plotting
+#convert emmeans to dataframe
+emm_epm_df <- as.data.frame(emm_epm)
+emm_epm_df
+```
+
+```{r}
+#pairwise comparison with tukey, due to lots of syllable comparisons (more tests)
+pairwise_epm <- contrast(emm_epm, method = "pairwise", adjust = "tukey") #bonferroni, Satterthwaite, Kenward-Roger, holm, tukey, dunnett, sidak [tukey, holm]
+#kenward-roger is for unequal sample size
+summary(pairwise_epm)
+```
+
+```{r}
+# Convert the pairwise results into a data frame using summary
+pairwise_results_epm <- summary(pairwise_epm)
+
+# Filter significant results (p-value < 0.05)
+sig_results_epm <- pairwise_results_epm %>%
+  filter(p.value < 0.05)
+
+# Add significance labels (***, **, *, ns)
+sig_labels_epm <- pairwise_results_epm %>%
+  mutate(
+    label = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  )
+
+# View labeled results
+print(sig_labels_epm)
+```
+
+```{r}
+#used for plotting significance lines; assigned group (control, post_w1, post_w2 to a contrast pairwise comparison)
+#group 1 starts, group 2 finishes
+sig_labels_epm <- pairwise_results_epm %>%
+  mutate(
+    group1 = case_when(
+      contrast == "control - post_w1" ~ "control",
+      contrast == "control - post_w2" ~ "control",
+      contrast == "post_w1 - post_w2" ~ "post_w1"
+    ),
+    group2 = case_when(
+      contrast == "control - post_w1" ~ "post_w1",
+      contrast == "control - post_w2" ~ "post_w2",
+      contrast == "post_w1 - post_w2" ~ "post_w2",
+    ),
+    y.position = 95 + 
+                 c(0, 8, 4), # stagger heights (switched group 2 and 3)
+    p.adj.signif = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  ) %>%
+  select(group1, group2, y.position, p.adj.signif)
+sig_labels_epm <- sig_labels_epm[c(1, 3, 2), ]
+sig_labels_epm
+```
+
+```{r}
+# Create the plot
+plot_epm <- ggplot(emm_epm_df, aes(x = group, y = emmean, color = group, group = group)) +
+  # Add points at the means for each group
+  geom_point(size = 3) +
+  # Add error bars for standard error
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2) +
+  # Custom colors for different groups
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  # Labels for axes and legend
+  labs(
+    x = "Timepoint",
+    y = "Frequency in Closed Arms (%)",
+    color = NULL
+  ) +
+  # Apply clean theme
+  theme_bw() +
+  theme(
+    text = element_text(size = 13),
+    panel.grid.minor = element_blank(),
+    legend.position = "right",
+    legend.box.margin = margin(0, 50, 0, 0),
+    axis.text.x = element_blank()
+    )
+
+# Add raw individual data points (from your etho_epm dataset)
+plot_epm <- plot_epm + 
+  geom_jitter(data = etho_epm, aes(x = group, y = freq_ClosedArms, color = ID), 
+              size = 1.5, width = 0.1, alpha = 0.6, inherit.aes = FALSE)
+
+# Add in significant lines and astericks
+plot_epm <- plot_epm +
+  stat_pvalue_manual(sig_labels_epm, #stat_pvalue_manual is the function
+                     label = "p.adj.signif", 
+                     tip.length = 0.02, #changes dipped line bit
+                     size = 5)
+plot_epm
+#ggsave("epm_graph(freq).png", plot = plot_epm, width = 8, height = 6) #makes spaces visible
+```
+
+###time in closed arms
+
+```{r}
+model_epm2 <- lmer(time_ClosedArms ~ group + (1 | ID), data = etho_epm)
+summary(model_epm2)
+```
+
+```{r}
+#assumption check 1 - Normality of residuals (should be normally distributed) - violates
+qqnorm(resid(model_epm2))
+qqline(resid(model_epm2))
+#probs a lil' bit non-normal, thus, when calculating confidence intervals, used "boot" method which assumes non-normality
+```
+
+```{r}
+#checks for distribution, compliments residual plot
+hist(resid(model_epm2)) 
+```
+
+```{r}
+#Assumption 2 - Homoscedasticity (variance should be consistent) - violates??
+plot(fitted(model_epm2), resid(model_epm2))
+```
+
+```{r}
+#When you plot residuals by ID, you're looking for:
+#No systematic pattern across individuals.
+#No obvious trends within IDs (e.g., all high or all low residuals).
+#Ideally, residuals centered around zero with some variation.
+boxplot(resid(model_epm2) ~ etho_epm$ID)
+```
+
+```{r}
+#Assumption 3 - confidence intervals - passes
+confint(model_epm2, method = "boot")
+#if CI includes zero between 2.5% and 97.5% then that effect is not statistically significant.
+
+```
+
+```{r}
+# estimated marginal means for Distance_cm (taken from model)
+emm_epm2 <- emmeans(model_epm2, ~ group)
+emm_epm2
+#kenward-roger is for unequal sample size
+```
+
+```{r}
+#used for plotting
+#convert emmeans to dataframe
+emm_epm_df2 <- as.data.frame(emm_epm2)
+emm_epm_df2
+```
+
+```{r}
+#pairwise comparison with tukey, due to lots of syllable comparisons (more tests)
+pairwise_epm2 <- contrast(emm_epm2, method = "pairwise", adjust = "tukey") #bonferroni, Satterthwaite, Kenward-Roger, holm, tukey, dunnett, sidak [tukey, holm]
+#kenward-roger is for unequal sample size
+summary(pairwise_epm2)
+```
+
+```{r}
+# Convert the pairwise results into a data frame using summary
+pairwise_results_epm2 <- summary(pairwise_epm2)
+
+# Filter significant results (p-value < 0.05)
+sig_results_epm2 <- pairwise_results_epm2 %>%
+  filter(p.value < 0.05)
+
+# Add significance labels (***, **, *, ns)
+sig_labels_epm2 <- pairwise_results_epm2 %>%
+  mutate(
+    label = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  )
+
+# View labeled results
+print(sig_labels_epm2)
+
+```
+
+```{r}
+#used for plotting significance lines; assigned group (control, post_w1, post_w2 to a contrast pairwise comparison)
+#group 1 starts, group 2 finishes
+sig_labels_epm2 <- pairwise_results_epm2 %>%
+  mutate(
+    group1 = case_when(
+      contrast == "control - post_w1" ~ "control",
+      contrast == "control - post_w2" ~ "control",
+      contrast == "post_w1 - post_w2" ~ "post_w1"
+    ),
+    group2 = case_when(
+      contrast == "control - post_w1" ~ "post_w1",
+      contrast == "control - post_w2" ~ "post_w2",
+      contrast == "post_w1 - post_w2" ~ "post_w2",
+    ),
+    y.position = 105 + 
+                 c(0, 10, 5), # stagger heights (switched group 2 and 3)
+    p.adj.signif = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  ) %>%
+  select(group1, group2, y.position, p.adj.signif)
+sig_labels_epm2 <- sig_labels_epm2[c(1, 3, 2), ]
+sig_labels_epm2
+```
+
+```{r}
+# Create the plot
+plot_epm2 <- ggplot(emm_epm_df2, aes(x = group, y = emmean, color = group, group = group)) +
+  # Add points at the means for each group
+  geom_point(size = 3) +
+  # Add error bars for standard error
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2) +
+  # Custom colors for different groups
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  # Labels for axes and legend
+  labs(
+    x = "Timepoint",
+    y = "Time in Closed Arms (%)",
+    color = NULL
+  ) +
+  # Apply clean theme
+  theme_bw() +
+  theme(
+    text = element_text(size = 13),
+    panel.grid.minor = element_blank(),
+    legend.position = "right",
+    legend.box.margin = margin(0, 50, 0, 0),
+    axis.text.x = element_blank()
+    )
+
+# Add raw individual data points (from your etho_epm dataset)
+plot_epm2 <- plot_epm2 + 
+  geom_jitter(data = etho_epm, aes(x = group, y = time_ClosedArms, color = ID), 
+              size = 1.5, width = 0.1, alpha = 0.6, inherit.aes = FALSE)
+
+# Add in significant lines and astericks
+plot_epm2 <- plot_epm2 +
+  stat_pvalue_manual(sig_labels_epm2, #stat_pvalue_manual is the function
+                     label = "p.adj.signif", 
+                     tip.length = 0.02, #changes dipped line bit
+                     size = 5)
+plot_epm2
+#ggsave("epm_graph(time).png", plot = plot_epm2, width = 8, height = 6) #makes spaces visible
+```
+
+##3CT
+
+###general social
+
+```{r}
+# Load Excel file (.xlsx) — specify sheet if needed
+etho_3ct <- read_excel("3CT_gen_social_ethovision.xlsx")
+
+# Set ID and group as factors
+etho_3ct$ID <- as.factor(etho_3ct$ID)
+etho_3ct$group <- factor(etho_3ct$group, levels = c("control", "post_w1", "post_w2"))  # sets "control" as baseline
+
+# Convert renamed columns to numeric
+etho_3ct$'general_sociability' <- as.numeric(etho_3ct$'general_sociability')
+```
+
+```{r}
+names(etho_3ct)
+```
+```{r}
+model_3ct <- lmer(general_sociability ~ group + (1 | ID), data = etho_3ct)
+summary(model_3ct)
+```
+```{r}
+#assumption check 1 - Normality of residuals (should be normally distributed) - violates
+qqnorm(resid(model_3ct))
+qqline(resid(model_3ct))
+#probs a lil' bit non-normal, thus, when calculating confidence intervals, used "boot" method which assumes non-normality
+```
+```{r}
+#checks for distribution, compliments residual plot
+hist(resid(model_3ct))
+```
+```{r}
+#Assumption 2 - Homoscedasticity (variance should be consistent) - passes
+plot(fitted(model_3ct), resid(model_3ct))
+#meets assumption, evenly distributed, thus, Homoscedasticity
+```
+```{r}
+#When you plot residuals by ID, you're looking for:
+#No systematic pattern across individuals.
+#No obvious trends within IDs (e.g., all high or all low residuals).
+#Ideally, residuals centered around zero with some variation.
+boxplot(resid(model_3ct) ~ etho_3ct$ID)
+```
+```{r}
+#Assumption 3 - confidence intervals - passes
+confint(model_3ct, method = "boot")
+#if CI includes zero between 2.5% and 97.5% then that effect is not statistically significant.
+
+```
+```{r}
+# estimated marginal means for Distance_cm (taken from model)
+emm_3ct <- emmeans(model_3ct, ~ group)
+emm_3ct
+#kenward-roger is for unequal sample size
+```
+```{r}
+#used for plotting
+#convert emmeans to dataframe
+emm_3ct_df <- as.data.frame(emm_3ct)
+emm_3ct_df
+```
+```{r}
+#pairwise comparison with tukey, due to lots of syllable comparisons (more tests)
+pairwise_3ct <- contrast(emm_3ct, method = "pairwise", adjust = "tukey") #bonferroni, Satterthwaite, Kenward-Roger, holm, tukey, dunnett, sidak [tukey, holm]
+#kenward-roger is for unequal sample size
+summary(pairwise_3ct)
+```
+```{r}
+# Convert the pairwise results into a data frame using summary
+pairwise_results_3ct <- summary(pairwise_3ct)
+
+# Filter significant results (p-value < 0.05)
+sig_results_3ct <- pairwise_results_3ct %>%
+  filter(p.value < 0.05)
+
+# Add significance labels (***, **, *, ns)
+sig_labels_3ct <- pairwise_results_3ct %>%
+  mutate(
+    label = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  )
+
+# View labeled results
+print(sig_labels_3ct)
+
+```
+
+```{r}
+#used for plotting significance lines; assigned group (control, post_w1, post_w2 to a contrast pairwise comparison)
+#group 1 starts, group 2 finishes
+sig_labels_3ct <- pairwise_results_3ct %>%
+  mutate(
+    group1 = case_when(
+      contrast == "control - post_w1" ~ "control",
+      contrast == "control - post_w2" ~ "control",
+      contrast == "post_w1 - post_w2" ~ "post_w1"
+    ),
+    group2 = case_when(
+      contrast == "control - post_w1" ~ "post_w1",
+      contrast == "control - post_w2" ~ "post_w2",
+      contrast == "post_w1 - post_w2" ~ "post_w2",
+    ),
+    y.position = 1 + 
+                 c(0.1, 0.3, 0.2), # stagger heights (switched group 2 and 3)
+    p.adj.signif = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  ) %>%
+  select(group1, group2, y.position, p.adj.signif)
+sig_labels_3ct <- sig_labels_3ct[c(1, 3, 2), ]
+sig_labels_3ct
+```
+```{r}
+# Create the plot
+plot_3ct <- ggplot(emm_3ct_df, aes(x = group, y = emmean, color = group, group = group)) +
+  # Add points at the means for each group
+  geom_point(size = 3) +
+  # Add error bars for standard error
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2) +
+  # Custom colors for different groups
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  # Labels for axes and legend
+  labs(
+    x = "Timepoint",
+    y = "General Sociability Index",
+    color = NULL
+  ) +
+  # Apply clean theme
+  theme_bw() +
+  theme(
+    text = element_text(size = 13),
+    panel.grid.minor = element_blank(),
+    legend.position = "right",
+    legend.box.margin = margin(0, 50, 0, 0),
+    axis.text.x = element_blank()
+    )
+
+# Add raw individual data points (from your etho_3ct dataset)
+plot_3ct <- plot_3ct + 
+  geom_jitter(data = etho_3ct, aes(x = group, y = general_sociability, color = ID), 
+              size = 1.5, width = 0.1, alpha = 0.6, inherit.aes = FALSE)
+
+# Add in significant lines and astericks
+plot_3ct <- plot_3ct +
+  stat_pvalue_manual(sig_labels_3ct, #stat_pvalue_manual is the function
+                     label = "p.adj.signif", 
+                     tip.length = 0.02, #changes dipped line bit
+                     size = 5)
+plot_3ct
+#ggsave("3ct_graph(general_sociability).png", plot = plot_3ct, width = 8, height = 6) #makes spaces visible
+```
+
+###novel social
+
+```{r}
+# Load Excel file (.xlsx) — specify sheet if needed
+etho_3ct2 <- read_excel("3CT_novel_social_ethovision.xlsx")
+
+# Set ID and group as factors
+etho_3ct2$ID <- as.factor(etho_3ct2$ID)
+etho_3ct2$group <- factor(etho_3ct2$group, levels = c("control", "post_w1", "post_w2"))  # sets "control" as baseline
+
+# Convert renamed columns to numeric
+etho_3ct2$'novel_sociability' <- as.numeric(etho_3ct2$'novel_sociability')
+```
+
+```{r}
+names(etho_3ct2)
+```
+
+```{r}
+model_3ct2 <- lmer(novel_sociability ~ group + (1 | ID), data = etho_3ct2)
+summary(model_3ct2)
+```
+
+```{r}
+#assumption check 1 - Normality of residuals (should be normally distributed) - violates
+qqnorm(resid(model_3ct2))
+qqline(resid(model_3ct2))
+#probs a lil' bit non-normal, thus, when calculating confidence intervals, used "boot" method which assumes non-normality
+```
+
+```{r}
+#assumption check 1 - Normality of residuals (should be normally distributed) - violates
+qqnorm(resid(model_3ct2))
+qqline(resid(model_3ct2))
+#probs a lil' bit non-normal, thus, when calculating confidence intervals, used "boot" method which assumes non-normality
+```
+```{r}
+#checks for distribution, compliments residual plot
+hist(resid(model_3ct2))
+```
+```{r}
+#Assumption 2 - Homoscedasticity (variance should be consistent) - passes
+plot(fitted(model_3ct2), resid(model_3ct2))
+#meets assumption, evenly distributed, thus, Homoscedasticity
+```
+```{r}
+#When you plot residuals by ID, you're looking for:
+#No systematic pattern across individuals.
+#No obvious trends within IDs (e.g., all high or all low residuals).
+#Ideally, residuals centered around zero with some variation.
+boxplot(resid(model_3ct2) ~ etho_3ct2$ID)
+```
+```{r}
+#Assumption 3 - confidence intervals - passes
+confint(model_3ct2, method = "boot")
+#if CI includes zero between 2.5% and 97.5% then that effect is not statistically significant.
+
+```
+```{r}
+# estimated marginal means for Distance_cm (taken from model)
+emm_3ct2 <- emmeans(model_3ct2, ~ group)
+emm_3ct2
+#kenward-roger is for unequal sample size
+```
+```{r}
+#used for plotting
+#convert emmeans to dataframe
+emm_3ct_df2 <- as.data.frame(emm_3ct2)
+emm_3ct_df2
+```
+```{r}
+#pairwise comparison with tukey, due to lots of syllable comparisons (more tests)
+pairwise_3ct2 <- contrast(emm_3ct2, method = "pairwise", adjust = "tukey") #bonferroni, Satterthwaite, Kenward-Roger, holm, tukey, dunnett, sidak [tukey, holm]
+#kenward-roger is for unequal sample size
+summary(pairwise_3ct2)
+```
+```{r}
+# Convert the pairwise results into a data frame using summary
+pairwise_results_3ct2 <- summary(pairwise_3ct2)
+
+# Filter significant results (p-value < 0.05)
+sig_results_3ct2 <- pairwise_results_3ct2 %>%
+  filter(p.value < 0.05)
+
+# Add significance labels (***, **, *, ns)
+sig_labels_3ct2 <- pairwise_results_3ct2 %>%
+  mutate(
+    label = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  )
+
+# View labeled results
+print(sig_labels_3ct2)
+
+```
+```{r}
+#used for plotting significance lines; assigned group (control, post_w1, post_w2 to a contrast pairwise comparison)
+#group 1 starts, group 2 finishes
+sig_labels_3ct2 <- pairwise_results_3ct2 %>%
+  mutate(
+    group1 = case_when(
+      contrast == "control - post_w1" ~ "control",
+      contrast == "control - post_w2" ~ "control",
+      contrast == "post_w1 - post_w2" ~ "post_w1"
+    ),
+    group2 = case_when(
+      contrast == "control - post_w1" ~ "post_w1",
+      contrast == "control - post_w2" ~ "post_w2",
+      contrast == "post_w1 - post_w2" ~ "post_w2",
+    ),
+    y.position = 1 + 
+                 c(0.1, 0.3, 0.2 ), # stagger heights (switched group 2 and 3)
+    p.adj.signif = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  ) %>%
+  select(group1, group2, y.position, p.adj.signif)
+sig_labels_3ct2 <- sig_labels_3ct2[c(1, 3, 2), ]
+sig_labels_3ct2
+```
+
+```{r}
+# Create the plot
+plot_3ct2 <- ggplot(emm_3ct_df2, aes(x = group, y = emmean, color = group, group = group)) +
+  # Add points at the means for each group
+  geom_point(size = 3) +
+  # Add error bars for standard error
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2) +
+  # Custom colors for different groups
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  # Labels for axes and legend
+  labs(
+    x = "Timepoint",
+    y = "Novel Sociability Index",
+    color = NULL
+  ) +
+  # Apply clean theme
+  theme_bw() +
+  theme(
+    text = element_text(size = 13),
+    panel.grid.minor = element_blank(),
+    legend.position = "right",
+    legend.box.margin = margin(0, 50, 0, 0),
+    axis.text.x = element_blank()
+    )
+
+# Add raw individual data points (from your etho_3ct dataset)
+plot_3ct2 <- plot_3ct2 + 
+  geom_jitter(data = etho_3ct2, aes(x = group, y = novel_sociability, color = ID), 
+              size = 1.5, width = 0.1, alpha = 0.6, inherit.aes = FALSE)
+
+# Add in significant lines and astericks
+plot_3ct2 <- plot_3ct2 +
+  stat_pvalue_manual(sig_labels_3ct2, #stat_pvalue_manual is the function
+                     label = "p.adj.signif", 
+                     tip.length = 0.02, #changes dipped line bit
+                     size = 5)
+plot_3ct2
+#ggsave("3ct_graph(novel_sociability).png", plot = plot_3ct2, width = 8, height = 6) #makes spaces visible
+```
+##LDCT
+
+####darkness anxiety
+
+```{r}
+# Load Excel file (.xlsx) — specify sheet if needed
+etho_ldct <- read_excel("LDCT_summary_ethovision.xlsx")
+
+# Set ID and group as factors
+etho_ldct$ID <- as.factor(etho_ldct$ID)
+etho_ldct$group <- factor(etho_ldct$group, levels = c("control", "post_w1", "post_w2"))  # sets "control" as baseline
+
+# Convert renamed columns to numeric
+etho_ldct$'dark_dura_%' <- as.numeric(etho_ldct$'dark_dura_%')
+```
+
+
+```{r}
+names(etho_ldct)
+```
+
+```{r}
+model_ldct <- lmer(`dark_dura_%` ~ group + (1 | ID), data = etho_ldct)
+summary(model_ldct)
+```
+
+```{r}
+#assumption check 1 - Normality of residuals (should be normally distributed) - violates
+qqnorm(resid(model_ldct))
+qqline(resid(model_ldct))
+#probs a lil' bit non-normal, thus, when calculating confidence intervals, used "boot" method which assumes non-normality
+```
+
+```{r}
+#checks for distribution, compliments residual plot
+hist(resid(model_ldct)) 
+```
+
+```{r}
+#Assumption 2 - Homoscedasticity (variance should be consistent) - passes
+plot(fitted(model_ldct), resid(model_ldct))
+#meets assumption, evenly distributed, thus, Homoscedasticity
+```
+
+```{r}
+#When you plot residuals by ID, you're looking for:
+#No systematic pattern across individuals.
+#No obvious trends within IDs (e.g., all high or all low residuals).
+#Ideally, residuals centered around zero with some variation.
+boxplot(resid(model_ldct) ~ etho_ldct$ID)
+```
+
+```{r}
+#Assumption 3 - confidence intervals - passes
+confint(model_ldct, method = "boot")
+#if CI includes zero between 2.5% and 97.5% then that effect is not statistically significant.
+
+```
+
+```{r}
+# estimated marginal means for Distance_cm (taken from model)
+emm_ldct <- emmeans(model_ldct, ~ group)
+emm_ldct
+#kenward-roger is for unequal sample size
+```
+
+```{r}
+#used for plotting
+#convert emmeans to dataframe
+emm_ldct_df <- as.data.frame(emm_ldct)
+emm_ldct_df
+```
+
+```{r}
+#pairwise comparison with tukey, due to lots of syllable comparisons (more tests)
+pairwise_ldct <- contrast(emm_ldct, method = "pairwise", adjust = "tukey") #bonferroni, Satterthwaite, Kenward-Roger, holm, tukey, dunnett, sidak [tukey, holm]
+#kenward-roger is for unequal sample size
+summary(pairwise_ldct)
+```
+
+```{r}
+# Convert the pairwise results into a data frame using summary
+pairwise_results_ldct <- summary(pairwise_ldct)
+
+# Filter significant results (p-value < 0.05)
+sig_results_ldct <- pairwise_results_ldct %>%
+  filter(p.value < 0.05)
+
+# Add significance labels (***, **, *, ns)
+sig_labels_ldct <- pairwise_results_ldct %>%
+  mutate(
+    label = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  )
+
+# View labeled results
+print(sig_labels_ldct)
+```
+
+```{r}
+#used for plotting significance lines; assigned group (control, post_w1, post_w2 to a contrast pairwise comparison)
+#group 1 starts, group 2 finishes
+sig_labels_ldct <- pairwise_results_ldct %>%
+  mutate(
+    group1 = case_when(
+      contrast == "control - post_w1" ~ "control",
+      contrast == "control - post_w2" ~ "control",
+      contrast == "post_w1 - post_w2" ~ "post_w1"
+    ),
+    group2 = case_when(
+      contrast == "control - post_w1" ~ "post_w1",
+      contrast == "control - post_w2" ~ "post_w2",
+      contrast == "post_w1 - post_w2" ~ "post_w2",
+    ),
+    y.position = 80 + 
+                 c(0, 8, 4), # stagger heights (switched group 2 and 3)
+    p.adj.signif = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  ) %>%
+  select(group1, group2, y.position, p.adj.signif)
+sig_labels_ldct <- sig_labels_ldct[c(1, 3, 2), ]
+sig_labels_ldct
+```
+
+```{r}
+# Create the plot
+plot_ldct <- ggplot(emm_ldct_df, aes(x = group, y = emmean, color = group, group = group)) +
+  # Add points at the means for each group
+  geom_point(size = 3) +
+  # Add error bars for standard error
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2) +
+  # Custom colors for different groups
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  # Labels for axes and legend
+  labs(
+    x = "Timepoint",
+    y = "Darkness Peference (%)",
+    color = NULL
+  ) +
+  # Apply clean theme
+  theme_bw() +
+  theme(
+    text = element_text(size = 13),
+    panel.grid.minor = element_blank(),
+    legend.position = "right",
+    legend.box.margin = margin(0, 50, 0, 0),
+    axis.text.x = element_blank()
+    )
+
+# Add raw individual data points (from your etho_ldct dataset)
+plot_ldct <- plot_ldct + 
+  geom_jitter(data = etho_ldct, aes(x = group, y = `dark_dura_%`, color = ID), 
+              size = 1.5, width = 0.1, alpha = 0.6, inherit.aes = FALSE)
+
+# Add in significant lines and astericks
+plot_ldct <- plot_ldct +
+  stat_pvalue_manual(sig_labels_ldct, #stat_pvalue_manual is the function
+                     label = "p.adj.signif", 
+                     tip.length = 0.02, #changes dipped line bit
+                     size = 5)
+plot_ldct
+#ggsave("ldct_graph(dark_pref).png", plot = plot_ldct, width = 8, height = 6) #makes spaces visible
+```
+
+##OFT raincloud
+
+###distance
+
+```{r}
+iqr_df <- etho_oft %>%
+  group_by(group) %>%
+  summarise(
+    y_min = quantile(Distance_cm, 0.25),
+    y_max = quantile(Distance_cm, 0.75),
+    .groups = "drop"
+  )
+```
+
+
+```{r}
+plot_raincloud_oft <- ggplot(etho_oft, aes(x = group, y = Distance_cm, fill = group, color = group)) +
+  
+  # Half-violin, nudged left
+  stat_halfeye(
+    side = "left",
+    adjust = 0.5,
+    justification = 1.1,
+    .width = 0,
+    point_colour = NA,
+    alpha = 0.6,
+    scale = 0.5, #make plot narrower
+    position = position_nudge(x = -0.05)
+  ) +
+  
+#  # Boxplot
+#  geom_boxplot(
+#    width = 0.05,
+#    outlier.shape = NA,
+#    alpha = 0.7,
+#    color = "black",
+#    show.legend=FALSE,
+#    position = position_nudge(x = -0.15)
+#  ) +
+  
+  #connect IDs
+  geom_line(
+  aes(x = group, y = Distance_cm, group = ID),
+  color = "gray50",
+  linewidth = 0.5,
+  alpha = 0.4
+) +
+
+ # Jittered points
+  geom_jitter(
+    width = 0.04,
+    size = 2.0,
+    alpha = 0.5,
+  ) +
+  
+  #add means for SE bars
+  geom_point(
+    data = emm_oft_df,
+    aes(x = group, y = emmean),
+    color = "black",
+    size = 3.0,
+    inherit.aes = FALSE,
+    position = position_nudge(x = -0.15)
+  ) +
+  
+  #adding in model SE data
+  geom_errorbar(
+    data = emm_oft_df,
+    aes(x = group, ymin = emmean - SE, ymax = emmean + SE),
+    width = 0.10,
+    inherit.aes = FALSE,
+    linewidth = 0.6,
+    position = position_nudge(x = -0.15)
+  ) +
+  
+  
+  # Add in significant lines and asterisks
+  stat_pvalue_manual(
+    sig_labels_oft,
+    label = "p.adj.signif",
+    tip.length = 0.02,
+    size = 6,
+    inherit.aes = FALSE
+  ) +
+
+  # Manual colors
+  scale_fill_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  
+  
+  # Labels and theme
+  labs(
+    x = "Disease Progression",
+    y = "Distance Moved (cm)",
+    fill = "Group",
+    color = "Group"
+  ) +
+  theme_bw() +
+  theme(
+    text = element_text(size = 18),
+    legend.position = "right"
+  )
+
+plot_raincloud_oft
+#ggsave("oft_cloud_graph_SE(distance).png", plot = plot_raincloud_oft, width = 8, height = 6) #makes spaces visible
+```
+
+```{r}
+#descriptive stats for boxplot/violin plot?
+##bp_stats_oft <- layer_data(plot_raincloud_oft, i = 1)  #i=2 : second layer where boxplot is
+#fill:	The fill color (linked to a group like "#feca8d" for "control").
+#ymin:	Lower whisker = max(min value, Q1 - 1.5 × IQR).
+#lower:	Q1 (25th percentile).
+#middle:	Median (50th percentile).
+#upper:	Q3 (75th percentile).
+#ymax:	Upper whisker = min(max value, Q3 + 1.5 × IQR).
+#outliers:	A list of any outlier values beyond the whiskers. dbl [1] means 1 outlier value in the list
+#notchupper, notchlower	Used if notch = TRUE; otherwise approximated around the median.
+#ymin_final and ymax_final include the outliers values, they do not represent whiskers though
+##bp_stats_oft <- bp_stats_oft[, c("fill", "group", "ymax", "upper", "middle", "lower", "ymin", "outliers")]
+##print(bp_stats_oft)
+```
+
+
+```{r}
+oft_desc_stats_distance <- etho_oft %>%
+  group_by(group) %>%
+  summarise(
+    n = n(),
+    mean = mean(Distance_cm, na.rm = TRUE),
+    median = median(Distance_cm, na.rm = TRUE),
+    sd = sd(Distance_cm, na.rm = TRUE),
+    Q1 = quantile(Distance_cm, 0.25, na.rm = TRUE),
+    Q3 = quantile(Distance_cm, 0.75, na.rm = TRUE),
+    IQR = IQR(Distance_cm, na.rm = TRUE),
+    min = min(Distance_cm, na.rm = TRUE),
+    max = max(Distance_cm, na.rm = TRUE)
+  )
+oft_desc_stats_distance
+```
+
+
+###speed
+
+```{r}
+plot_raincloud_oft2 <- ggplot(etho_oft, aes(x = group, y = `Velocity_cm/s`, fill = group, color = group)) +
+  
+  # Half-violin, nudged left
+  stat_halfeye(
+    side = "left",
+    adjust = 0.5,
+    justification = 1.1,
+    .width = 0,
+    point_colour = NA,
+    alpha = 0.6,
+    scale = 0.5, #make plot narrower
+    position = position_nudge(x = -0.05)
+  ) +
+  
+#  # Boxplot
+#  geom_boxplot(
+#    width = 0.05,
+#    outlier.shape = NA,
+#    alpha = 0.7,
+#    color = "black",
+#    show.legend=FALSE,
+#    position = position_nudge(x = -0.15)
+#  ) +
+  
+  #connect IDs
+  geom_line(
+  aes(x = group, y = `Velocity_cm/s`, group = ID),
+  color = "gray50",
+  linewidth = 0.5,
+  alpha = 0.4
+) +
+
+ # Jittered points
+  geom_jitter(
+    width = 0.04,
+    size = 2.0,
+    alpha = 0.5,
+  ) +
+  
+  #add means for SE bars
+  geom_point(
+    data = emm_oft_df2,
+    aes(x = group, y = emmean),
+    color = "black",
+    size = 3.0,
+    inherit.aes = FALSE,
+    position = position_nudge(x = -0.15)
+  ) +
+  
+  #adding in model SE data
+  geom_errorbar(
+    data = emm_oft_df2,
+    aes(x = group, ymin = emmean - SE, ymax = emmean + SE),
+    width = 0.10,
+    inherit.aes = FALSE,
+    linewidth = 0.6,
+    position = position_nudge(x = -0.15)
+  ) +
+  
+  
+  # Add in significant lines and asterisks
+  stat_pvalue_manual(
+    sig_labels_oft2,
+    label = "p.adj.signif",
+    tip.length = 0.02,
+    size = 6,
+    inherit.aes = FALSE
+  ) +
+
+  # Manual colors
+  scale_fill_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  
+  
+  # Labels and theme
+  labs(
+    x = "Disease Progression",
+    y = "Velocity (cm/s)",
+    fill = "Group",
+    color = "Group"
+  ) +
+  theme_bw() +
+  theme(
+    text = element_text(size = 18),
+    legend.position = "right"
+  )
+
+plot_raincloud_oft2
+#ggsave("oft_cloud_graph_SE(speed).png", plot = plot_raincloud_oft2, width = 8, height = 6) #makes spaces visible
+```
+
+```{r}
+#descriptive stats for boxplot/violin plot?
+##bp_stats_oft2 <- layer_data(plot_raincloud_oft2, i = 2)  #i=2 : second layer where boxplot is
+#fill:	The fill color (linked to a group like "#feca8d" for "control").
+#ymin:	Lower whisker = max(min value, Q1 - 1.5 × IQR).
+#lower:	Q1 (25th percentile).
+#middle:	Median (50th percentile).
+#upper:	Q3 (75th percentile).
+#ymax:	Upper whisker = min(max value, Q3 + 1.5 × IQR).
+#outliers:	A list of any outlier values beyond the whiskers. dbl [1] means 1 outlier value in the list
+#notchupper, notchlower	Used if notch = TRUE; otherwise approximated around the median.
+#ymin_final and ymax_final include the outliers values, they do not represent whiskers though
+##bp_stats_oft2 <- bp_stats_oft2[, c("fill", "group", "ymax", "upper", "middle", "lower", "ymin", "outliers")]
+##print(bp_stats_oft2)
+```
+
+```{r}
+oft_desc_stats_speed <- etho_oft %>%
+  group_by(group) %>%
+  summarise(
+    n = n(),
+    mean = mean(`Velocity_cm/s`, na.rm = TRUE),
+    median = median(`Velocity_cm/s`, na.rm = TRUE),
+    sd = sd(`Velocity_cm/s`, na.rm = TRUE),
+    Q1 = quantile(`Velocity_cm/s`, 0.25, na.rm = TRUE),
+    Q3 = quantile(`Velocity_cm/s`, 0.75, na.rm = TRUE),
+    IQR = IQR(`Velocity_cm/s`, na.rm = TRUE),
+    min = min(`Velocity_cm/s`, na.rm = TRUE),
+    max = max(`Velocity_cm/s`, na.rm = TRUE)
+  )
+oft_desc_stats_speed
+```
+
+
+
+###periphery pref
+
+```{r}
+plot_raincloud_oft3 <- ggplot(etho_oft, aes(x = group, y = periphery_pref, fill = group, color = group)) +
+  
+  # Half-violin, nudged left
+  stat_halfeye(
+    side = "left",
+    adjust = 0.5,
+    justification = 1.1,
+    .width = 0,
+    point_colour = NA,
+    alpha = 0.6,
+    scale = 0.5, #make plot narrower
+    position = position_nudge(x = -0.05),
+  ) +
+  
+#  # Boxplot
+#  geom_boxplot(
+#    width = 0.05,
+#    outlier.shape = NA,
+#    alpha = 0.7,
+#    color = "black",
+#    show.legend=FALSE,
+#    position = position_nudge(x = -0.15)
+#  ) +
+  
+  #connect IDs
+  geom_line(
+  aes(x = group, y = periphery_pref, group = ID),
+  color = "gray50",
+  linewidth = 0.5,
+  alpha = 0.4,
+) +
+
+ # Jittered points
+  geom_jitter(
+    width = 0.04,
+    size = 2.0,
+    alpha = 0.5,
+  ) +
+  
+  #add means for SE bars
+  geom_point(
+    data = emm_oft_df3,
+    aes(x = group, y = emmean),
+    color = "black",
+    size = 3.0,
+    inherit.aes = FALSE,
+    position = position_nudge(x = -0.15),
+  ) +
+  
+  #adding in model SE data
+  geom_errorbar(
+    data = emm_oft_df3,
+    aes(x = group, ymin = emmean - SE, ymax = emmean + SE),
+    width = 0.1,
+    inherit.aes = FALSE,
+    linewidth = 0.6,
+    position = position_nudge(x = -0.15),
+  ) +
+  
+  
+  # Add in significant lines and asterisks
+  stat_pvalue_manual(
+    sig_labels_oft3,
+    label = "p.adj.signif",
+    tip.length = 0.02,
+    size = 6,
+    inherit.aes = FALSE
+  ) +
+
+  # Manual colors
+  scale_fill_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  
+  
+  # Labels and theme
+  labs(
+    x = "Disease Progression",
+    y = "Periphery Preference (%)",
+    fill = 'Group',
+    color = 'Group'
+  ) +
+  theme_bw() +
+  theme(
+    text = element_text(size = 18),
+    legend.position = "right"
+  )
+
+plot_raincloud_oft3
+#ggsave("oft_cloud_graph_SE(peri).png", plot = plot_raincloud_oft3, width = 8, height = 6) #makes spaces visible
+```
+
+```{r}
+#descriptive stats for boxplot/violin plot?
+##bp_stats_oft3 <- layer_data(plot_raincloud_oft3, i = 2)  #i=2 : second layer where boxplot is
+#fill:	The fill color (linked to a group like "#feca8d" for "control").
+#ymin:	Lower whisker = max(min value, Q1 - 1.5 × IQR).
+#lower:	Q1 (25th percentile).
+#middle:	Median (50th percentile).
+#upper:	Q3 (75th percentile).
+#ymax:	Upper whisker = min(max value, Q3 + 1.5 × IQR).
+#outliers:	A list of any outlier values beyond the whiskers. dbl [1] means 1 outlier value in the list
+#notchupper, notchlower	Used if notch = TRUE; otherwise approximated around the median.
+#ymin_final and ymax_final include the outliers values, they do not represent whiskers though
+##bp_stats_oft3 <- bp_stats_oft3[, c("fill", "group", "ymax", "upper", "middle", "lower", "ymin", "outliers")]
+##print(bp_stats_oft3)
+```
+
+```{r}
+oft_desc_stats_peri <- etho_oft %>%
+  group_by(group) %>%
+  summarise(
+    n = n(),
+    mean = mean(periphery_pref, na.rm = TRUE),
+    median = median(periphery_pref, na.rm = TRUE),
+    sd = sd(periphery_pref, na.rm = TRUE),
+    Q1 = quantile(periphery_pref, 0.25, na.rm = TRUE),
+    Q3 = quantile(periphery_pref, 0.75, na.rm = TRUE),
+    IQR = IQR(periphery_pref, na.rm = TRUE),
+    min = min(periphery_pref, na.rm = TRUE),
+    max = max(periphery_pref, na.rm = TRUE)
+  )
+oft_desc_stats_peri
+```
+###correlation speed x distance
+
+```{r}
+model_oft_corr <- lm(Distance_cm ~ `Velocity_cm/s` * group, data = etho_oft)
+summary(model_oft_corr)
+```
+
+
+```{r}
+# Correlation plot for distance and speed across groups because speed and distance have similar relationships from previous plots
+oft_corr_plot <- ggplot(etho_oft, aes(x = `Velocity_cm/s`, y = Distance_cm, color = group)) +
+  geom_jitter(size = 2,
+              alpha = 0.6,
+              width = 0.1,   # add jitter width for points
+              height = 0,    # no vertical jitter
+              show.legend  = TRUE) +
+
+  geom_smooth(method = "lm", se = FALSE, aes(color = group)) +  # separate lm lines by group
+  
+  stat_cor(
+    aes(label = after_stat(paste(r.label, p.label, sep = "~`,`~")), group = group),
+    method = "pearson",
+    label.x.npc = "left",
+    label.y.npc = "top",
+    inherit.aes = TRUE
+  ) +
+  
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  
+  labs(
+    title = "Correlation of Speed vs Distance across Groups",
+    x = "Mean Speed (cm/s)",
+    y = "Total Distance (cm)",
+    color = "Group"
+  ) +
+  
+  theme_bw() +
+  theme(
+    text = element_text(size = 13),
+    legend.position = "right"
+  )
+
+print(oft_corr_plot)
+```
+
+
+##NOR raincloud
+
+###time novel object
+
+```{r}
+plot_raincloud_nor <- ggplot(etho_nor, aes(x = group, y = familiarity_contact, fill = group, color = group)) +
+  
+  # Half-violin, nudged left
+  stat_halfeye(
+    side = "left",
+    adjust = 0.5,
+    justification = 1.1,
+    .width = 0,
+    point_colour = NA,
+    alpha = 0.6,
+    scale = 0.5, #make plot narrower
+    position = position_nudge(x = -0.05)
+  ) +
+  
+#  # Boxplot
+#  geom_boxplot(
+#    width = 0.05,
+#    outlier.shape = NA,
+#    alpha = 0.7,
+#    color = "black",
+#    show.legend=FALSE,
+#    position = position_nudge(x = -0.15)
+#  ) +
+  
+  #connect IDs
+  geom_line(
+  aes(x = group, y = familiarity_contact, group = ID),
+  color = "gray50",
+  linewidth = 0.5,
+  alpha = 0.4
+) +
+
+ # Jittered points
+  geom_jitter(
+    width = 0.04,
+    size = 2.0,
+    alpha = 0.5,
+  ) +
+  
+  #add means for SE bars
+  geom_point(
+    data = emm_nor_df2,
+    aes(x = group, y = emmean),
+    color = "black",
+    size = 3.0,
+    inherit.aes = FALSE,
+    position = position_nudge(x = -0.15)
+  ) +
+  
+  #adding in model SE data
+  geom_errorbar(
+    data = emm_nor_df2,
+    aes(x = group, ymin = emmean - SE, ymax = emmean + SE),
+    width = 0.10,
+    inherit.aes = FALSE,
+    linewidth = 0.6,
+    position = position_nudge(x = -0.15)
+  ) +
+  
+  
+  # Add in significant lines and asterisks
+  stat_pvalue_manual(
+    sig_labels_nor2,
+    label = "p.adj.signif",
+    tip.length = 0.02,
+    size = 6,
+    inherit.aes = FALSE
+  ) +
+
+  # Manual colors
+  scale_fill_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  
+  
+  # Labels and theme
+  labs(
+    x = "Disease Progression",
+    y = "Object Recognition (%)",
+    fill = "Group",
+    color = "Group"
+  ) +
+  theme_bw() +
+  theme(
+    text = element_text(size = 18),
+    legend.position = "right"
+  )
+
+plot_raincloud_nor
+#ggsave("nor_cloud_graph_SE(memory).png", plot = plot_raincloud_nor, width = 8, height = 6) #makes spaces visible
+```
+
+```{r}
+#descriptive stats for boxplot/violin plot?
+##bp_stats_nor <- layer_data(plot_raincloud_nor, i = 2)  #i=2 : second layer where boxplot is
+#fill:	The fill color (linked to a group like "#feca8d" for "control").
+#ymin:	Lower whisker = max(min value, Q1 - 1.5 × IQR).
+#lower:	Q1 (25th percentile).
+#middle:	Median (50th percentile).
+#upper:	Q3 (75th percentile).
+#ymax:	Upper whisker = min(max value, Q3 + 1.5 × IQR).
+#outliers:	A list of any outlier values beyond the whiskers. dbl [1] means 1 outlier value in the list
+#notchupper, notchlower	Used if notch = TRUE; otherwise approximated around the median.
+#ymin_final and ymax_final include the outliers values, they do not represent whiskers though
+##bp_stats_nor <- bp_stats_nor[, c("fill", "group", "ymax", "upper", "middle", "lower", "ymin", "outliers")]
+##print(bp_stats_nor)
+```
+
+```{r}
+nor_desc_stats_memory <- etho_nor %>%
+  group_by(group) %>%
+  summarise(
+    n = n(),
+    mean = mean(familiarity_contact, na.rm = TRUE),
+    median = median(familiarity_contact, na.rm = TRUE),
+    sd = sd(familiarity_contact, na.rm = TRUE),
+    Q1 = quantile(familiarity_contact, 0.25, na.rm = TRUE),
+    Q3 = quantile(familiarity_contact, 0.75, na.rm = TRUE),
+    IQR = IQR(familiarity_contact, na.rm = TRUE),
+    min = min(familiarity_contact, na.rm = TRUE),
+    max = max(familiarity_contact, na.rm = TRUE)
+  )
+nor_desc_stats_memory
+```
+
+
+##EPM raincloud
+
+####frequency closed arms
+
+```{r}
+plot_raincloud_epm <- ggplot(etho_epm, aes(x = group, y = freq_ClosedArms, fill = group, color = group)) +
+  
+  # Half-violin, nudged left
+  stat_halfeye(
+    side = "left",
+    adjust = 0.5,
+    justification = 1.1,
+    .width = 0,
+    point_colour = NA,
+    alpha = 0.6,
+    scale = 0.5, #make plot narrower
+    position = position_nudge(x = -0.05)
+  ) +
+  
+#  # Boxplot
+#  geom_boxplot(
+#    width = 0.05,
+#    outlier.shape = NA,
+#    alpha = 0.7,
+#    color = "black",
+#    show.legend=FALSE,
+#    position = position_nudge(x = -0.15)
+#  ) +
+  
+  #connect IDs
+  geom_line(
+  aes(x = group, y = freq_ClosedArms, group = ID),
+  color = "gray50",
+  linewidth = 0.5,
+  alpha = 0.4
+) +
+
+ # Jittered points
+  geom_jitter(
+    width = 0.04,
+    size = 2.0,
+    alpha = 0.5,
+  ) +
+  
+  #add means for SE bars
+ geom_point(
+    data = emm_epm_df,
+    aes(x = group, y = emmean),
+    color = "black",
+    size = 3.0,
+    inherit.aes = FALSE,
+    position = position_nudge(x = -0.15)
+  ) +
+  
+  #adding in model SE data
+  geom_errorbar(
+    data = emm_epm_df,
+    aes(x = group, ymin = emmean - SE, ymax = emmean + SE),
+    width = 0.10,
+    inherit.aes = FALSE,
+    linewidth = 0.6,
+    position = position_nudge(x = -0.15)
+  ) +
+  
+  
+  # Add in significant lines and asterisks
+  stat_pvalue_manual(
+    sig_labels_epm,
+    label = "p.adj.signif",
+    tip.length = 0.02,
+    size = 6,
+    inherit.aes = FALSE
+  ) +
+
+  # Manual colors
+  scale_fill_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  
+  
+  # Labels and theme
+  labs(
+    x = "Disease Progression",
+    y = "Frequency in Closed Arms (%)",
+    fill = "Group",
+    color = "Group"
+  ) +
+  theme_bw() +
+  theme(
+    text = element_text(size = 18),
+    legend.position = "right"
+  )
+
+plot_raincloud_epm
+#ggsave("epm_cloud_graph_SE(freq_c).png", plot = plot_raincloud_epm, width = 8, height = 6) #makes spaces visible
+```
+
+```{r}
+#descriptive stats for boxplot/violin plot?
+##bp_stats_epm <- layer_data(plot_raincloud_epm, i = 2)  #i=2 : second layer where boxplot is
+#fill:	The fill color (linked to a group like "#feca8d" for "control").
+#ymin:	Lower whisker = max(min value, Q1 - 1.5 × IQR).
+#lower:	Q1 (25th percentile).
+#middle:	Median (50th percentile).
+#upper:	Q3 (75th percentile).
+#ymax:	Upper whisker = min(max value, Q3 + 1.5 × IQR).
+#outliers:	A list of any outlier values beyond the whiskers. dbl [1] means 1 outlier value in the list
+#notchupper, notchlower	Used if notch = TRUE; otherwise approximated around the median.
+#ymin_final and ymax_final include the outliers values, they do not represent whiskers though
+##bp_stats_epm <- bp_stats_epm[, c("fill", "group", "ymax", "upper", "middle", "lower", "ymin", "outliers")]
+##print(bp_stats_epm)
+```
+
+```{r}
+epm_desc_stats_freqc <- etho_epm %>%
+  group_by(group) %>%
+  summarise(
+    n = n(),
+    mean = mean(freq_ClosedArms, na.rm = TRUE),
+    median = median(freq_ClosedArms, na.rm = TRUE),
+    sd = sd(freq_ClosedArms, na.rm = TRUE),
+    Q1 = quantile(freq_ClosedArms, 0.25, na.rm = TRUE),
+    Q3 = quantile(freq_ClosedArms, 0.75, na.rm = TRUE),
+    IQR = IQR(freq_ClosedArms, na.rm = TRUE),
+    min = min(freq_ClosedArms, na.rm = TRUE),
+    max = max(freq_ClosedArms, na.rm = TRUE)
+  )
+epm_desc_stats_freqc
+```
+
+
+###time in closed arms
+
+```{r}
+plot_raincloud_epm2 <- ggplot(etho_epm, aes(x = group, y = time_ClosedArms, fill = group, color = group)) +
+  
+  # Half-violin, nudged left
+  stat_halfeye(
+    side = "left",
+    adjust = 0.5,
+    justification = 1.1,
+    .width = 0,
+    point_colour = NA,
+    alpha = 0.6,
+    scale = 0.5, #make plot narrower
+    position = position_nudge(x = -0.05)
+  ) +
+  
+#  # Boxplot
+#  geom_boxplot(
+#    width = 0.05,
+#    outlier.shape = NA,
+#    alpha = 0.7,
+#    color = "black",
+#    show.legend=FALSE,
+#    position = position_nudge(x = -0.15)
+#  ) +
+  
+  #connect IDs
+  geom_line(
+  aes(x = group, y = time_ClosedArms, group = ID),
+  color = "gray50",
+  linewidth = 0.5,
+  alpha = 0.4
+) +
+
+ # Jittered points
+  geom_jitter(
+    width = 0.04,
+    size = 2.0,
+    alpha = 0.5,
+  ) +
+  
+  #add means for SE bars
+  geom_point(
+    data = emm_epm_df2,
+    aes(x = group, y = emmean),
+    color = "black",
+    size = 3.0,
+    inherit.aes = FALSE,
+    position = position_nudge(x = -0.15)
+  ) +
+  
+  #adding in model SE data
+  geom_errorbar(
+    data = emm_epm_df2,
+    aes(x = group, ymin = emmean - SE, ymax = emmean + SE),
+    width = 0.10,
+    inherit.aes = FALSE,
+    linewidth = 0.6,
+    position = position_nudge(x = -0.15)
+  ) +
+  
+  
+  # Add in significant lines and asterisks
+  stat_pvalue_manual(
+    sig_labels_epm2,
+    label = "p.adj.signif",
+    tip.length = 0.02,
+    size = 6,
+    inherit.aes = FALSE
+  ) +
+
+  # Manual colors
+  scale_fill_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  
+  
+  # Labels and theme
+  labs(
+    x = "Disease Progression",
+    y = "Time in Closed Arms (%)",
+    fill = "Group",
+    color = "Group"
+  ) +
+  theme_bw() +
+  theme(
+    text = element_text(size = 18),
+    legend.position = "right"
+  )
+
+plot_raincloud_epm2
+#ggsave("epm_cloud_graph_SE(time_c.png", plot = plot_raincloud_epm2, width = 8, height = 6) #makes spaces visible
+```
+
+```{r}
+#descriptive stats for boxplot/violin plot?
+##bp_stats_epm2 <- layer_data(plot_raincloud_epm2, i = 2)  #i=2 : second layer where boxplot is
+#fill:	The fill color (linked to a group like "#feca8d" for "control").
+#ymin:	Lower whisker = max(min value, Q1 - 1.5 × IQR).
+#lower:	Q1 (25th percentile).
+#middle:	Median (50th percentile).
+#upper:	Q3 (75th percentile).
+#ymax:	Upper whisker = min(max value, Q3 + 1.5 × IQR).
+#outliers:	A list of any outlier values beyond the whiskers. dbl [1] means 1 outlier value in the list
+#notchupper, notchlower	Used if notch = TRUE; otherwise approximated around the median.
+#ymin_final and ymax_final include the outliers values, they do not represent whiskers though
+##bp_stats_epm2 <- bp_stats_epm2[, c("fill", "group", "ymax", "upper", "middle", "lower", "ymin", "outliers")]
+##print(bp_stats_epm2)
+```
+
+```{r}
+epm_desc_stats_timec <- etho_epm %>%
+  group_by(group) %>%
+  summarise(
+    n = n(),
+    mean = mean(time_ClosedArms, na.rm = TRUE),
+    median = median(time_ClosedArms, na.rm = TRUE),
+    sd = sd(time_ClosedArms, na.rm = TRUE),
+    Q1 = quantile(time_ClosedArms, 0.25, na.rm = TRUE),
+    Q3 = quantile(time_ClosedArms, 0.75, na.rm = TRUE),
+    IQR = IQR(time_ClosedArms, na.rm = TRUE),
+    min = min(time_ClosedArms, na.rm = TRUE),
+    max = max(time_ClosedArms, na.rm = TRUE)
+  )
+epm_desc_stats_timec
+```
+
+
+##3CT raincloud
+
+###general social
+
+```{r}
+plot_raincloud_3ct <- ggplot(etho_3ct, aes(x = group, y = general_sociability, fill = group, color = group)) +
+  
+  # Half-violin, nudged left
+  stat_halfeye(
+    side = "left",
+    adjust = 0.5,
+    justification = 1.1,
+    .width = 0,
+    point_colour = NA,
+    alpha = 0.6,
+    scale = 0.5, #make plot narrower
+    position = position_nudge(x = -0.05)
+  ) +
+  
+#  # Boxplot
+#  geom_boxplot(
+#    width = 0.05,
+#    outlier.shape = NA,
+#    alpha = 0.7,
+#    color = "black",
+#    show.legend=FALSE,
+#    position = position_nudge(x = -0.15)
+#  ) +
+  
+  #connect IDs
+  geom_line(
+  aes(x = group, y = general_sociability, group = ID),
+  color = "gray50",
+  linewidth = 0.5,
+  alpha = 0.4
+) +
+
+ # Jittered points
+  geom_jitter(
+    width = 0.04,
+    size = 2.0,
+    alpha = 0.5,
+  ) +
+  
+  #add means for SE bars
+  geom_point(
+    data = emm_3ct_df,
+    aes(x = group, y = emmean),
+    color = "black",
+    size = 3.0,
+    inherit.aes = FALSE,
+    position = position_nudge(x = -0.15)
+  ) +
+  
+  #adding in model SE data
+  geom_errorbar(
+    data = emm_3ct_df,
+    aes(x = group, ymin = emmean - SE, ymax = emmean + SE),
+    width = 0.10,
+    inherit.aes = FALSE,
+    linewidth = 0.6,
+    position = position_nudge(x = -0.15)
+  ) +
+  
+  
+  # Add in significant lines and asterisks
+  stat_pvalue_manual(
+    sig_labels_3ct,
+    label = "p.adj.signif",
+    tip.length = 0.02,
+    size = 6,
+    inherit.aes = FALSE
+  ) +
+
+  # Manual colors
+  scale_fill_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  
+  
+  # Labels and theme
+  labs(
+    x = "Disease Progression",
+    y = "General Sociability Index",
+    fill = "Group",
+    color = "Group"
+  ) +
+  theme_bw() +
+  theme(
+    text = element_text(size = 18),
+    legend.position = "right"
+  )
+
+plot_raincloud_3ct
+#ggsave("3ct_cloud_graph_SE(general).png", plot = plot_raincloud_3ct, width = 8, height = 6) #makes spaces visible
+```
+
+```{r}
+#descriptive stats for boxplot/violin plot?
+##bp_stats_3ct <- layer_data(plot_raincloud_3ct, i = 2)  #i=2 : second layer where boxplot is
+#fill:	The fill color (linked to a group like "#feca8d" for "control").
+#ymin:	Lower whisker = max(min value, Q1 - 1.5 × IQR).
+#lower:	Q1 (25th percentile).
+#middle:	Median (50th percentile).
+#upper:	Q3 (75th percentile).
+#ymax:	Upper whisker = min(max value, Q3 + 1.5 × IQR).
+#outliers:	A list of any outlier values beyond the whiskers. dbl [1] means 1 outlier value in the list
+#notchupper, notchlower	Used if notch = TRUE; otherwise approximated around the median.
+#ymin_final and ymax_final include the outliers values, they do not represent whiskers though
+##bp_stats_3ct <- bp_stats_3ct[, c("fill", "group", "ymax", "upper", "middle", "lower", "ymin", "outliers")]
+##print(bp_stats_3ct)
+```
+
+```{r}
+etho_3ct_desc_stats_gen <- etho_3ct %>%
+  group_by(group) %>%
+  summarise(
+    n = n(),
+    mean = mean(general_sociability, na.rm = TRUE),
+    median = median(general_sociability, na.rm = TRUE),
+    sd = sd(general_sociability, na.rm = TRUE),
+    Q1 = quantile(general_sociability, 0.25, na.rm = TRUE),
+    Q3 = quantile(general_sociability, 0.75, na.rm = TRUE),
+    IQR = IQR(general_sociability, na.rm = TRUE),
+    min = min(general_sociability, na.rm = TRUE),
+    max = max(general_sociability, na.rm = TRUE)
+  )
+etho_3ct_desc_stats_gen
+```
+
+
+###novel social
+
+```{r}
+plot_raincloud_3ct2 <- ggplot(etho_3ct2, aes(x = group, y = novel_sociability, fill = group, color = group)) +
+  
+  # Half-violin, nudged left
+  stat_halfeye(
+    side = "left",
+    adjust = 0.5,
+    justification = 1.1,
+    .width = 0,
+    point_colour = NA,
+    alpha = 0.6,
+    scale = 0.5, #make plot narrower
+    position = position_nudge(x = -0.05)
+  ) +
+  
+#  # Boxplot
+#  geom_boxplot(
+#    width = 0.05,
+#    outlier.shape = NA,
+#    alpha = 0.7,
+#    color = "black",
+#    show.legend=FALSE,
+#    position = position_nudge(x = -0.15)
+#  ) +
+  
+  #connect IDs
+  geom_line(
+  aes(x = group, y = novel_sociability, group = ID),
+  color = "gray50",
+  linewidth = 0.5,
+  alpha = 0.4
+) +
+
+ # Jittered points
+  geom_jitter(
+    width = 0.04,
+    size = 2.0,
+    alpha = 0.5,
+  ) +
+  
+  #add means for SE bars
+  geom_point(
+    data = emm_3ct_df2,
+    aes(x = group, y = emmean),
+    color = "black",
+    size = 3.0,
+    inherit.aes = FALSE,
+    position = position_nudge(x = -0.15)
+  ) +
+  
+  #adding in model SE data
+  geom_errorbar(
+    data = emm_3ct_df2,
+    aes(x = group, ymin = emmean - SE, ymax = emmean + SE),
+    width = 0.10,
+    inherit.aes = FALSE,
+    linewidth = 0.6,
+    position = position_nudge(x = -0.15)
+  ) +
+  
+  
+  # Add in significant lines and asterisks
+  stat_pvalue_manual(
+    sig_labels_3ct2,
+    label = "p.adj.signif",
+    tip.length = 0.02,
+    size = 6,
+    inherit.aes = FALSE
+  ) +
+
+  # Manual colors
+  scale_fill_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  
+  
+  # Labels and theme
+  labs(
+    x = "Disease Progression",
+    y = "Novel Sociability Index",
+    fill = "Group",
+    color = "Group"
+  ) +
+  theme_bw() +
+  theme(
+    text = element_text(size = 18),
+    legend.position = "right"
+  )
+
+plot_raincloud_3ct2
+#ggsave("3ct_cloud_graph_SE(novel).png", plot = plot_raincloud_3ct2, width = 8, height = 6) #makes spaces visible
+```
+
+```{r}
+#descriptive stats for boxplot/violin plot?
+##bp_stats_3ct2 <- layer_data(plot_raincloud_3ct2, i = 2)  #i=2 : second layer where boxplot is
+#fill:	The fill color (linked to a group like "#feca8d" for "control").
+#ymin:	Lower whisker = max(min value, Q1 - 1.5 × IQR).
+#lower:	Q1 (25th percentile).
+#middle:	Median (50th percentile).
+#upper:	Q3 (75th percentile).
+#ymax:	Upper whisker = min(max value, Q3 + 1.5 × IQR).
+#outliers:	A list of any outlier values beyond the whiskers. dbl [1] means 1 outlier value in the list
+#notchupper, notchlower	Used if notch = TRUE; otherwise approximated around the median.
+#ymin_final and ymax_final include the outliers values, they do not represent whiskers though
+##bp_stats_3ct2 <- bp_stats_3ct2[, c("fill", "group", "ymax", "upper", "middle", "lower", "ymin", "outliers")]
+##print(bp_stats_3ct2)
+```
+
+```{r}
+etho_3ct_desc_stats_nov <- etho_3ct2 %>%
+  group_by(group) %>%
+  summarise(
+    n = n(),
+    mean = mean(novel_sociability, na.rm = TRUE),
+    median = median(novel_sociability, na.rm = TRUE),
+    sd = sd(novel_sociability, na.rm = TRUE),
+    Q1 = quantile(novel_sociability, 0.25, na.rm = TRUE),
+    Q3 = quantile(novel_sociability, 0.75, na.rm = TRUE),
+    IQR = IQR(novel_sociability, na.rm = TRUE),
+    min = min(novel_sociability, na.rm = TRUE),
+    max = max(novel_sociability, na.rm = TRUE)
+  )
+etho_3ct_desc_stats_nov
+```
+
+
+##LDCT Raincloud
+
+###darkness anxiety
+
+```{r}
+plot_raincloud_ldct <- ggplot(etho_ldct, aes(x = group, y = `dark_dura_%`, fill = group, color = group)) +
+  
+  # Half-violin, nudged left
+  stat_halfeye(
+    side = "left",
+    adjust = 0.5,
+    justification = 1.1,
+    .width = 0,
+    point_colour = NA,
+    alpha = 0.6,
+    scale = 0.5, #make plot narrower
+    position = position_nudge(x = -0.05)
+  ) +
+  
+#  # Boxplot
+#  geom_boxplot(
+#    width = 0.05,
+#    outlier.shape = NA,
+#    alpha = 0.7,
+#    color = "black",
+#    show.legend=FALSE,
+#    position = position_nudge(x = -0.15)
+#  ) +
+  
+  #connect IDs
+  geom_line(
+  aes(x = group, y = `dark_dura_%`, group = ID),
+  color = "gray50",
+  linewidth = 0.5,
+  alpha = 0.4
+) +
+
+ # Jittered points
+  geom_jitter(
+    width = 0.04,
+    size = 2.0,
+    alpha = 0.5,
+  ) +
+  
+  #add means for SE bars
+  geom_point(
+    data = emm_ldct_df,
+    aes(x = group, y = emmean),
+    color = "black",
+    size = 3.0,
+    inherit.aes = FALSE,
+    position = position_nudge(x = -0.15)
+  ) +
+  
+  #adding in model SE data
+  geom_errorbar(
+    data = emm_ldct_df,
+    aes(x = group, ymin = emmean - SE, ymax = emmean + SE),
+    width = 0.10,
+    inherit.aes = FALSE,
+    linewidth = 0.6,
+    position = position_nudge(x = -0.15)
+  ) +
+  
+  
+  # Add in significant lines and asterisks
+  stat_pvalue_manual(
+    sig_labels_ldct,
+    label = "p.adj.signif",
+    tip.length = 0.02,
+    size = 6,
+    inherit.aes = FALSE
+  ) +
+
+  # Manual colors
+  scale_fill_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  scale_color_manual(values = c("control" = "#feca8d", "post_w1" = "#f1605d", "post_w2" = "#440f76")) +
+  
+  
+  # Labels and theme
+  labs(
+    x = "Disease Progression",
+    y = "Darkness Preference (%)",
+    fill = "Group",
+    color = "Group"
+  ) +
+  theme_bw() +
+  theme(
+    text = element_text(size = 18),
+    legend.position = "right"
+  )
+
+plot_raincloud_ldct
+#ggsave("ldct_cloud_graph_SE.png", plot = plot_raincloud_ldct, width = 8, height = 6) #makes spaces visible
+```
+
+```{r}
+ldct_desc_stats <- etho_ldct %>%
+  group_by(group) %>%
+  summarise(
+    n = n(),
+    mean = mean(`dark_dura_%`, na.rm = TRUE),
+    median = median(`dark_dura_%`, na.rm = TRUE),
+    sd = sd(`dark_dura_%`, na.rm = TRUE),
+    Q1 = quantile(`dark_dura_%`, 0.25, na.rm = TRUE),
+    Q3 = quantile(`dark_dura_%`, 0.75, na.rm = TRUE),
+    IQR = IQR(`dark_dura_%`, na.rm = TRUE),
+    min = min(`dark_dura_%`, na.rm = TRUE),
+    max = max(`dark_dura_%`, na.rm = TRUE)
+  )
+ldct_desc_stats
+```
+
+
