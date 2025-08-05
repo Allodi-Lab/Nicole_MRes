@@ -28,10 +28,8 @@ https://github.com/Allodi-Lab
 
 ---
 
-
-## Version
-
 > **Note:**  
-> For Ethovision_analysis, model statistics were first determined then raincloud plots produced wich were used in the thesis.
-> For the MoSeq_analysis, model statistical were first determined, then the SE values were determined, the SE values were then ordered by control frequency. the `ordered_SE` data was used for the thesis. GEELM model was just for testing and can be ignored.
-> For RNAscope_analysis, attempted replication of the code used in GraphPad Prism, but was unsuccessful. Data used in thesis was analysed in GraphPad Prism instead, using a Nested T-Test.
+> For `Ethovision_analysis`, model statistics were first determined, then raincloud plots were produced, which were used in the thesis.  
+> For the `MoSeq_analysis`, model statistics were first determined, then the SE values were determined. The SE values were then ordered by control frequency. The `ordered_SE` data was used for the thesis. GEELM model was just for testing and can be ignored.  
+> For `RNAscope_analysis`, attempted replication of the code used in GraphPad Prism, but was unsuccessful. Data used in the thesis was analysed in GraphPad Prism instead, using a Nested T-Test.
+
