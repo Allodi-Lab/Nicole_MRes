@@ -29,7 +29,7 @@ https://github.com/Allodi-Lab
 ---
 
 > **Note:**  
-> For `Ethovision_analysis`, model statistics were first determined, then raincloud plots were produced, which were used in the thesis.  
+> For `Ethovision_analysis`, Ethovision outputs (raw) were compiled into excel files for each group (control, post_w1, post_w2) for eac paradigm. The `summary excel files` were used for analysis, which is a compilation of the raw excel files. model statistics were first determined, then raincloud plots were produced, which were used in the thesis.  
 > For the `MoSeq_analysis`, model statistics were first determined, then the SE values were determined. The SE values were then ordered by control frequency. The `ordered_SE` data was used for the thesis. GEELM model was just for testing and can be ignored.  
 > For `RNAscope_analysis`, attempted replication of the code used in GraphPad Prism, but was unsuccessful. Data used in the thesis was analysed in GraphPad Prism instead, using a Nested T-Test.
 
